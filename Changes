@@ -1,5 +1,9 @@
 Revision history for Perl extension POE::Component::Daemon.
 
+0.1001 2006/Sep/14
+    - Remove signal handlers so that kernel can still exit.  This is 
+      required in the new, refcount on sig kernels (post 0.36)
+      Thank you Andrew Hoying
 
 0.10 2006/Feb/22
     - First public release

@@ -1,4 +1,4 @@
-#$Id: Daemon.pm,v 1.6 2005/09/08 23:34:40 fil Exp $
+#$Id: Daemon.pm,v 1.7 2005/10/13 00:54:23 fil Exp $
 ########################################################
 package POE::Component::Daemon;
 
@@ -15,7 +15,11 @@ use POE::API::Peek;
 
 use POE::Component::Daemon::Scoreboard;
 
-$VERSION = '0.10';
+<<<<<<< Daemon.pm
+$VERSION = '0.1001';
+=======
+$VERSION = '0.0402';
+>>>>>>> 1.7
 
 sub DEBUG () { 0 }
 sub DEBUG_SC () { DEBUG or 0 }
@@ -137,8 +141,12 @@ sub create_session
                         check_scoreboard
                         fork retry waste_time
                         babysit rogues shutdown
+<<<<<<< Daemon.pm
                         foreign_child
                         sig_CHLD sig_INT sig_TERM sig_HUP
+=======
+                        sig_CHLD sig_INT sig_TERM
+>>>>>>> 1.7
                         )]
             ]);
 }
@@ -196,6 +204,7 @@ sub _start
     $kernel->alias_set($self->{alias});
     $Daemon::alias=$self->{alias};
 
+    $kernel->sig(TERM => 'sig_TERM');
     $kernel->sig(CHLD => 'sig_CHLD');
     $kernel->sig(HUP  => 'sig_HUP') if $self->{logfile};
     $kernel->sig(INT  => 'sig_INT'); 
@@ -470,6 +479,12 @@ sub shutdown
     $kernel->delay('check_scoreboard');     # get it OVER with
     $self->{'die'}=1;                       # prevent race conditions
     $self->inform_others( 'daemon_shutdown' );
+
+    # Remove signal handlers so that some versions of POE can shut down 
+    $kernel->sig( 'CHLD' );
+    $kernel->sig( 'HUP'  );
+    $kernel->sig( 'INT'  ); 
+    $kernel->sig( 'TERM' ); 
     return;
 }
 
@@ -736,7 +751,23 @@ sub sig_INT
     ( DEBUG or $self->{verbose} ) and 
         warn "$$: SIGINT";
     $kernel->yield('shutdown');
-    $kernel->sig_handled();
+    $kernel->sig_handled();         # INT is a terminal
+    return;
+}
+
+########################################################
+# daemontool's svc -d sends a TERM to the parent.
+# Propagate it down to the children
+# The shutdown event handler takes care of cleanup.
+sub sig_TERM
+{
+    my ($kernel, $self, $signal, $pid, $status) =  
+                @_[KERNEL, HEAP, ARG0, ARG1, ARG2];
+
+    # DEBUG and 
+        warn "$$: SIGTERM";
+    $kernel->yield('shutdown');
+    $kernel->sig_handled();         # TERM is a terminal
     return;
 }
 
@@ -803,7 +834,7 @@ sub fork_off
     }
     
     DEBUG and warn "$$: Fork off $n children";
-    for(my $q=0; $q < $n; $q++) {
+    for(my $q1=0; $q1 < $n; $q1++) {
         $self->{"pending forks"}++;
         $poe_kernel->yield('fork');
     }
@@ -996,13 +1027,13 @@ sub status
     my($self)=@_;
     my @ret=ref($self);
 
-    my $q='the parent';
-    $q='a child' if $self->{'is a child'};
+    my $q1='the parent';
+    $q1='a child' if $self->{'is a child'};
     if($self->is_prefork) {
-        push @ret, "Pre-forking server, we are $q";
+        push @ret, "Pre-forking server, we are $q1";
     }
     elsif($self->is_fork) {
-        push @ret, "Forking server, we are $q";
+        push @ret, "Forking server, we are $q1";
     }
     else {
         push @ret, "Daemon server";
@@ -1093,36 +1124,36 @@ sub peek
             my $refcount=$api->get_session_refcount($session);
             $ret.="\n\t\tref count: $refcount\n";
 
-            my $q=$api->get_session_extref_count($session);
-            $ref += $q;
-            $ret.="\t\textref count: $q\n" if $q;
+            my $q1=$api->get_session_extref_count($session);
+            $ref += $q1;
+            $ret.="\t\textref count: $q1\n" if $q1;
 
-            $q=$api->session_handle_count($session);
-            $ref += $q;  
-            $ret.="\t\thandle count: $q (Stay alive)\n" if $q;
+            $q1=$api->session_handle_count($session);
+            $ref += $q1;  
+            $ret.="\t\thandle count: $q1 (Stay alive)\n" if $q1;
 
             my @aliases = $api->session_alias_list($session);
             $ref += @aliases;
-            $q=join ',', @aliases;
-            $ret.="\t\tAliases: $q\n" if $q;
+            $q1=join ',', @aliases;
+            $ret.="\t\tAliases: $q1\n" if $q1;
 
             my @children = $api->get_session_children($session);
             if(@children) {
                 $ref += @children;
-                $q = join ',', map {$api->session_id_loggable($_)} @children;
-                $ret.="\t\tChildren: $q\n";
+                $q1 = join ',', map {$api->session_id_loggable($_)} @children;
+                $ret.="\t\tChildren: $q1\n";
             }
 
-            $q = $events->{ $session->ID }{source};
-            if( $q ) {
-                $ret.="\t\tEvent source count: $q (Stay alive)\n";
-                $ref += $q;
+            $q1 = $events->{ $session->ID }{source};
+            if( $q1 ) {
+                $ret.="\t\tEvent source count: $q1 (Stay alive)\n";
+                $ref += $q1;
             }
 
-            my $q = $events->{ $session->ID }{destination};
-            if( $q ) {
-                $ret.="\t\tEvent destination count: $q (Stay alive)\n";
-                $ref += $q;
+            my $q1 = $events->{ $session->ID }{destination};
+            if( $q1 ) {
+                $ret.="\t\tEvent destination count: $q1 (Stay alive)\n";
+                $ref += $q1;
             }
 
             if($refcount != $ref) {
@@ -1213,7 +1244,7 @@ redirect STDERR to a log file if asked.
 
 POE::Component::Daemon also babysits child processes, handling their
 C<CHLD>.  POE::Component::Daemon can It also makes sure requests don't take
-to long.  If they do, it will try to get rid of them.  See L<BABYSITING>
+to long.  If they do, it will try to get rid of them.  See L</BABYSITING>
 below.
 
 POE::Component::Daemon does not handle listening on sockets.  That is up to
@@ -1225,7 +1256,7 @@ requests when approriate and so on.
 
 Sub-processes are maintained with the help of a scoreboard.  In some
 situations, your code will have to update it's status in scoreboard with the
-L<update_status> method.
+L</update_status> method.
 
 
 
@@ -1246,7 +1277,7 @@ This means the following steps are done.
     Create SocketFactory wheel
     Create POE::Component::Daemon
     Receive SocketFactory's SuccessEvent
-    Tell POE::Component::Daemon we are in a request (L<update_status>)
+    Tell POE::Component::Daemon we are in a request (L</update_status>)
     POE::Component::Daemon forks
     POE::Component::Daemon sends daemon_child signal
     Receive daemon_child signal, create ReadWrite wheel
@@ -1258,13 +1289,13 @@ This means the following steps are done.
     daemon_shutdown).
     
 Additionnaly, when POE::Component::Daemon detects that there are nearly too
-many child processes, it will send a C<daemon_pause> signal.  You should
-call C<accept_pause> on your SocketFactory's wheel.  When the number of
+many child processes, it will send a L</daemon_pause> signal.  You should
+call L<POE::Wheel::SocketFactory/accept_pause>.  When the number of
 child processes drops back down, POE::Component::Daemon will then send a
-C<daemon_accept> signal.  You should then call C<accept_resume> on your
-SocketFactory.
+C<daemon_accept> signal.  You should then call
+L<POE::Wheel::SocketFactory/accept_resume>.
 
-The graph in C<forking-flow.png> might (or might not) help you understand
+The graph in F<forking-flow.png> might (or might not) help you understand
 the above.
 
 
@@ -1277,18 +1308,19 @@ forking before it can be processed.  It also allows a child process to
 handle more then one request.  This is the model used by Apache.
 
 When pre-forking, you create your SocketFactory and immediately pause it
-with C<accept_pause>.  Then spawn a POE::Component::Daemon, and allow the
-kernel to run.  POE::Component::Daemon will fork off the desired initial number of
+with L<POE::Wheel::SocketFactory/accept_pause>.  Then spawn a
+L<POE::Component::Daemon>. and allow the kernel to run. 
+L<POE::Component::Daemon> will fork off the desired initial number of
 sub-processes (C<start_children>).  The child processes will be told they
-are children with a C<daemon_child> signal.  Your code then does what it
-needs and updates the status to 'wait' (C<update_status>).  When
-POE::Component::Daemon sees this, it fires off a C<daemon_accept> signal.  Your code
-would then unpause the socket, with C<accept_resume>.
+are children with a L</daemon_child> signal.  Your code then does what it
+needs and updates the status to 'wait' (L</update_status>).  When
+POE::Component::Daemon sees this, it fires off a L</daemon_accept> signal. 
+Your code would then unpause the socket, with L<POE::Wheel::SocketFactory/accept_resume>.
 
 When you receive a new connection, the status to 'req' or 'long' (if it's a
 long running request) and handle the request.  When done, update the status
 to 'done' (or 'wait').  POE::Component::Daemon sees this, and will either send another
-C<daemon_accept> signal to say it's time to start again or shutdown the
+L</daemon_accept> signal to say it's time to start again or shutdown the
 daemon if this child has handled enough requests.
 
 Note that when you receive a new request, you should pause your
@@ -1314,20 +1346,28 @@ In list form, that gives us:
     Update status to 'done'
     Wait for daemon_accept or daemon_shutdown signal    
 
-The graph in C<preforking-flow.png> might (or might not) help you understand
+The graph in F<preforking-flow.png> might (or might not) help you understand
 the above.
 
 
 =head1 NON-FORKING
 
 It is of course possible to use this code in a non-forking server.  While
-most functionnality of POE::Component::Daemon will be useless methods
-like C<drop_privs>, C<detach> and C<peek> are useful.
+most functionnality of L<POE::Component::Daemon> will be useless, methods
+like L</drop_privs>, L</detach> and L</peek> are useful.
 
 
 =head1 BABYSITING
 
-=head1 CALL SYNTAX
+Babysiting is the action of periodically monitoring all child processes to
+make sure none of them do anything bad.  For values of 'bad' limited to
+going rogue (using too much CPU) or disapearing without a trace.  Rogue
+processes are killed after 10 minutes.
+
+Babysiting is activated with the C<babysit> parameter to L</spawn>.
+
+Babysiting doesn't have a test case and is probably badly implemented. 
+Patches welcome.
 
 =head1 METHODS
 
@@ -1345,7 +1385,7 @@ it, other code that depends on it might be confused.
 =item detach
 
 If true, POE::Component::Daemon will detach from the current process tree.  It does
-this by forking twice and the grand-child then calls L<POSIX::setsid>. 
+this by forking twice and the grand-child then calls L<POSIX/setsid>. 
 Parent and grand-parent summarily exit.
 
 Default is to not detach.
@@ -1396,6 +1436,11 @@ The number of requests each child process is allowed to handle before it is
 killed off.  Limiting the number of requests prevents child processes from
 consuming too much memory or other resource.
 
+=item babysit
+
+Time, in seconds, between checks for rogue processes.  See L</BABYSITING>
+above.
+
 
 =back
 
@@ -1405,7 +1450,7 @@ consuming too much memory or other resource.
     $poe_kernel->post( Daemon=>'shutdown' );
 
 Tell POE::Component::Daemon to shutdown.  POE::Component::Daemon responds by cleaning up all
-traces in the kernel and broadcasting the C<daemon_shutdown> signal.  In the
+traces in the kernel and broadcasting the L</daemon_shutdown> signal.  In the
 parent process, it sends a C<TERM> signal to all child processes.
 
 
@@ -1434,8 +1479,7 @@ the daemon, including the current state of the scoreboard.
 
 Allows you to report a child process that you might have spawned with
 POE::Component::Daemon.  This obviates the need for you to have a CHLD
-handler.   They will receive a TERM when current process
-exists.
+handler.  They will receive a TERM when current process exists.
 
 
 
@@ -1469,13 +1513,13 @@ think it should, you simply type the following in another window.
 
 POE::Component::Daemon uses a scoreboard to keep track of child processes.  In a few
 situations, you must update the scoreboard to tell POE::Component::Daemon when certain
-events occur.  You do this with C<update_event>
+events occur.  You do this with L</update_status>
 
     Daemon->update_status( 'req', { handle=>$handle } );
     $poe_kernel->call( Daemon=>'update_status', 'long' );
 
 To find out when and why you should set your status, please read
-the L<PRE-FORKING> and L<POST-FORKING> sections above.
+the L</PRE-FORKING> and L</POST-FORKING> sections above.
 
 
 =over 4
@@ -1532,17 +1576,17 @@ interested in a given signal, simply register a handler with the kernel.
 
 The following signals are defined:
 
-=head2 C<daemon_start>
+=head2 daemon_start
 
 Posted from POE::Component::Daemon's _start event.
 
 
-=head2 C<daemon_parent>
+=head2 daemon_parent
 
 The current process is the parent.  This is sent by a pre-forking daemon
 when all the initial children have been forked.
 
-=head2 C<daemon_child>
+=head2 daemon_child
 
 The current process is a child.  
 
@@ -1552,7 +1596,7 @@ must then update the status to 'wait'.
 In post-forking daemon, this signal means that you may now handle the new
 request.  ARG1 is the data you passed to update_status( 'req' ).
 
-=head2 C<daemon_accept>
+=head2 daemon_accept
 
 The current process is ready to accept new requests.
 
@@ -1560,18 +1604,18 @@ This is sent by a pre-forking daemon when the status is updated to 'wait'.
 
 In post-forking daemon, this signal means that the number of child processes
 has fallen below the maximum and you may resume accepting new requests.
-Generally you do this by calling C<accept_resume> on your SocketFactory.
+Generally you do this by calling L<POE::Wheel::SocketFactory/accept_resume>.
 
 
-=head2 C<daemon_pause>
+=head2 daemon_pause
 
 There are too many child processes.  Do not accept any more requests. 
-Generally you do this by calling C<accept_pause> on your SocketFactory.
+Generally you do this by calling L<POE::Wheel::SocketFactory/accept_pause>.
 
 
-=head2 C<daemon_shutdown>
+=head2 daemon_shutdown
 
-Time to go to bed!  Sent my POE::Component::Daemon when it thinks it's time to
+Time to go to bed!  Sent by POE::Component::Daemon when it thinks it's time to
 shutdown.  This might be because of code called Daemon->shutdown or because
 of TERM or INT signals.  Additionnaly, in a pre-forking server a shutdown is
 called when a child process has handled a certain number of requests.
@@ -1587,7 +1631,7 @@ Doesn't support Windows.
 
 =head1 SEE ALSO
 
-C<POE>
+L<POE>
 
 =head1 AUTHOR
 
@@ -1603,6 +1647,9 @@ it under the same terms as Perl itself.
 =cut
 
 $Log: Daemon.pm,v $
+Revision 1.7  2005/10/13 00:54:23  fil
+Added sig_TERM
+
 Revision 1.6  2005/09/08 23:34:40  fil
 Don't send daemon_accept just after daemon_child
 Only send daemon_accept if moving from something else to wait

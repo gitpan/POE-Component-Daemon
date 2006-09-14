@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id$
+# $Id: 20_preforking.t,v 1.1 2006/09/14 18:28:46 fil Exp $
 
 use strict;
 
@@ -157,12 +157,12 @@ sub spawn_server
         $server="$dir/$server";
         last;
     }
-    local $ENV{PERL5LIB}=join ':', qw(blib/lib
-                            /home/fil/work/JAECA/JAAS/perl5lib/lib/perl5/site_p
-                            /home/fil/work/JAECA/JAAS/perl5lib/lib/site_perl   
-                            /home/fil/prive/perl5lib/lib/site_perl
-                            /home/fil/prive/lib), 
-                        ($ENV{PERL5LIB}||'~/honk');
+#    local $ENV{PERL5LIB}=join ':', qw(blib/lib
+#                            /home/fil/work/JAECA/JAAS/perl5lib/lib/perl5/site_p
+#                            /home/fil/work/JAECA/JAAS/perl5lib/lib/site_perl   
+#                            /home/fil/prive/perl5lib/lib/site_perl
+#                            /home/fil/prive/lib), 
+#                        ($ENV{PERL5LIB}||'~/honk');
 
     my $exec = $Config{perl5} || $Config{perlpath};
     if( $ENV{HARNESS_PERL_SWITCHES} ) {
@@ -190,4 +190,15 @@ sub connect_server
 
 __END__
 
-$Log$
+$Log: 20_preforking.t,v $
+Revision 1.1  2006/09/14 18:28:46  fil
+Added foreign_child()
+Added HUP and TERM support
+Moved signal sending to inform_others() and expedite_signal()
+expedite_signal by-passes POE's queue, by sending signals directly to
+    watchers via ->call();
+
+Added ->peek()
+Many tweaks for preforking child
+Coverage and tests
+

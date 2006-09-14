@@ -1,4 +1,4 @@
-#$Id: Scoreboard.pm,v 1.2 2004/10/21 03:06:19 fil Exp $
+#$Id: Scoreboard.pm,v 1.3 2006/09/14 18:28:46 fil Exp $
 ########################################################
 package POE::Component::Daemon::Scoreboard;
 
@@ -132,6 +132,17 @@ sub status
 __DATA__
 
 $Log: Scoreboard.pm,v $
+Revision 1.3  2006/09/14 18:28:46  fil
+Added foreign_child()
+Added HUP and TERM support
+Moved signal sending to inform_others() and expedite_signal()
+expedite_signal by-passes POE's queue, by sending signals directly to
+    watchers via ->call();
+
+Added ->peek()
+Many tweaks for preforking child
+Coverage and tests
+
 Revision 1.2  2004/10/21 03:06:19  fil
 Fixed KR_RUN_CALLED call for 5.004_05
 Improved debug output

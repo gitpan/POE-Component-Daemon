@@ -6,6 +6,8 @@ use Test::More ( tests => 14 );
 
 BEGIN { use_ok( "POE::Component::Daemon" ) }
 
+# diag( "POE is $INC{'POE.pm'} ($POE::VERSION)" );
+
 #########################################################
 my $daemon = POE::Component::Daemon->new( {
         start_children  => 10

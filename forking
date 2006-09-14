@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id$
+# $Id: forking,v 1.2 2006/09/14 18:28:46 fil Exp $
 
 use strict;
 
@@ -204,6 +204,17 @@ DEBUG and warn "$$: Exiting";
 __END__
 
 $Log: forking,v $
+Revision 1.2  2006/09/14 18:28:46  fil
+Added foreign_child()
+Added HUP and TERM support
+Moved signal sending to inform_others() and expedite_signal()
+expedite_signal by-passes POE's queue, by sending signals directly to
+    watchers via ->call();
+
+Added ->peek()
+Many tweaks for preforking child
+Coverage and tests
+
 Revision 1.1.1.1  2004/04/13 19:01:42  fil
 Honk
 
