@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id: 30_forking.t,v 1.1 2006/09/14 18:28:46 fil Exp $
+# $Id: 30_forking.t 134 2006-09-14 18:28:46Z fil $
 
 use strict;
 
@@ -193,7 +193,7 @@ sub connect_server
 
 __END__
 
-$Log: 30_forking.t,v $
+$Log$
 Revision 1.1  2006/09/14 18:28:46  fil
 Added foreign_child()
 Added HUP and TERM support

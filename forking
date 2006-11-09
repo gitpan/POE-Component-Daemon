@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id: forking,v 1.2 2006/09/14 18:28:46 fil Exp $
+# $Id: forking 134 2006-09-14 18:28:46Z fil $
 
 use strict;
 
@@ -203,7 +203,7 @@ DEBUG and warn "$$: Exiting";
 
 __END__
 
-$Log: forking,v $
+$Log$
 Revision 1.2  2006/09/14 18:28:46  fil
 Added foreign_child()
 Added HUP and TERM support

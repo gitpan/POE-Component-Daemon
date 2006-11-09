@@ -1,4 +1,4 @@
-#$Id: Daemon.pm,v 1.7 2005/10/13 00:54:23 fil Exp $
+#$Id: Daemon.pm 94 2005-10-13 00:54:23Z fil $
 ########################################################
 package POE::Component::Daemon;
 
@@ -15,11 +15,7 @@ use POE::API::Peek;
 
 use POE::Component::Daemon::Scoreboard;
 
-<<<<<<< Daemon.pm
-$VERSION = '0.1001';
-=======
-$VERSION = '0.0402';
->>>>>>> 1.7
+$VERSION = '0.1002';
 
 sub DEBUG () { 0 }
 sub DEBUG_SC () { DEBUG or 0 }
@@ -90,11 +86,6 @@ sub open_logfile
     return 1;
 }
 
-
-
-
-
-
 ########################################################
 sub detach
 {
@@ -141,12 +132,8 @@ sub create_session
                         check_scoreboard
                         fork retry waste_time
                         babysit rogues shutdown
-<<<<<<< Daemon.pm
                         foreign_child
                         sig_CHLD sig_INT sig_TERM sig_HUP
-=======
-                        sig_CHLD sig_INT sig_TERM
->>>>>>> 1.7
                         )]
             ]);
 }
@@ -384,9 +371,6 @@ sub babysit
     return;
 }
 
-
-
-
 ########################################################
 # Deal with rogue child processes
 sub rogues
@@ -533,7 +517,7 @@ sub fork
     DEBUG and warn "$$: Forking a child";
     my $pid = fork();                   # try to fork
     unless (defined($pid)) {            # did the fork fail?
-        $self->{scoreboard}->drop($slot);       # give slot back
+        $self->{scoreboard}->drop($slot);   # give slot back
         $self->fork_failed($!, "$!", $req);
         return;
     }
@@ -598,7 +582,6 @@ sub become_child
 
     $poe_kernel->sig('CHLD');
     $poe_kernel->sig('INT'); 
-
     # remove the wait for babysit
     $poe_kernel->delay('babysit') if $self->{'babysit'};
     # remove the wait for checking the scorebard
@@ -825,10 +808,10 @@ sub fork_off
             $poe_kernel->call( $poe_kernel->get_active_session, 
                                 'fork', @$n );
         } else {
-            foreach my $req (@$n) {
-                $self->{"pending forks"}++;
-                $poe_kernel->yield('fork', $req);
-            }
+        foreach my $req (@$n) {
+            $self->{"pending forks"}++;
+            $poe_kernel->yield('fork', $req);
+        }
         }
         return;
     }
@@ -872,21 +855,21 @@ sub check_scoreboard
 
 
     if( $self->is_prefork ) {
-        my $waiting=@waiting;
-        DEBUG and warn "$$: waiting=$waiting";
-        if($waiting < $self->{min_spare}) {
-            my $n=$self->{min_spare} - $waiting;
-            DEBUG_SC and 
-                warn "$$: Spawning $n spares";
-            $self->fork_off($n);
-        }
-        if($waiting > $self->{max_spare}) {
-            my $n=$waiting - $self->{max_spare};
-            DEBUG_SC and warn "$$: Killing $n spares";
+    my $waiting=@waiting;
+    DEBUG and warn "$$: waiting=$waiting";
+    if($waiting < $self->{min_spare}) {
+        my $n=$self->{min_spare} - $waiting;
+        DEBUG_SC and 
+            warn "$$: Spawning $n spares";
+        $self->fork_off($n);
+    }
+    if($waiting > $self->{max_spare}) {
+        my $n=$waiting - $self->{max_spare};
+        DEBUG_SC and warn "$$: Killing $n spares";
             foreach my $pid ( @waiting[0..($n-1)] ) {
-                kill SIGINT, $pid or warn "$$: killing $pid: $!";
-            }
+            kill SIGINT, $pid or warn "$$: killing $pid: $!";
         }
+    }
     }
     elsif( $self->is_fork and 
                     $self->{max_children} <= keys %{$self->{children}} ) {
@@ -1299,7 +1282,7 @@ The graph in F<forking-flow.png> might (or might not) help you understand
 the above.
 
 
-
+    
 =head2 PRE-FORKING
 
 The pre-forking model creates a pool of child processes before accepting
@@ -1558,7 +1541,7 @@ Process is forking, but we are still in the parent
 
 Process is forking, we are in the child.
 
-=item . 
+=item .
 
 Process is waiting for first request.
 
@@ -1646,7 +1629,7 @@ it under the same terms as Perl itself.
 
 =cut
 
-$Log: Daemon.pm,v $
+$Log$
 Revision 1.7  2005/10/13 00:54:23  fil
 Added sig_TERM
 

@@ -1,4 +1,4 @@
-#$Id: Scoreboard.pm,v 1.3 2006/09/14 18:28:46 fil Exp $
+#$Id: Scoreboard.pm 134 2006-09-14 18:28:46Z fil $
 ########################################################
 package POE::Component::Daemon::Scoreboard;
 
@@ -131,7 +131,7 @@ sub status
 
 __DATA__
 
-$Log: Scoreboard.pm,v $
+$Log$
 Revision 1.3  2006/09/14 18:28:46  fil
 Added foreign_child()
 Added HUP and TERM support
