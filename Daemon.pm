@@ -1,4 +1,4 @@
-#$Id: Daemon.pm 94 2005-10-13 00:54:23Z fil $
+#$Id: Daemon.pm 156 2006-11-09 20:24:58Z fil $
 ########################################################
 package POE::Component::Daemon;
 
@@ -15,7 +15,7 @@ use POE::API::Peek;
 
 use POE::Component::Daemon::Scoreboard;
 
-$VERSION = '0.1002';
+$VERSION = '0.1003';
 
 sub DEBUG () { 0 }
 sub DEBUG_SC () { DEBUG or 0 }
@@ -497,13 +497,12 @@ sub fork
         warn "$$: Maximum number of children reached!";
         warn "$$: max_children=$self->{max_children} currently=".(0+keys %{$self->{children}});
 
-        # 2006/02 This is the most lamentable bit of my algorythm
-        # By throwing fork events around, I could end up with too many 
-        # children.  Either I drop requests on the floor (bad), or
-        # I save them via fork_failed, which means they could end up
-        # in other children (less bad) or I just let them succeed
-        # and hope that > {mas_children} isn't all that horrendeous
-        # (least bad so far) 
+        # 2006/02 This is the most lamentable bit of my algorythm By
+        # throwing fork events around, I could end up with too many
+        # children.  Either I drop requests on the floor (bad), or I save
+        # them via fork_failed, which means the events could end up in other
+        # children (less bad) or I just let them succeed and hope that >
+        # {max_children} isn't all that horrendeous (least bad so far)
     }
 
     my $slot=$self->{scoreboard}->add('FORK');  # grap a slot in scoreboard
@@ -808,10 +807,10 @@ sub fork_off
             $poe_kernel->call( $poe_kernel->get_active_session, 
                                 'fork', @$n );
         } else {
-        foreach my $req (@$n) {
-            $self->{"pending forks"}++;
-            $poe_kernel->yield('fork', $req);
-        }
+            foreach my $req (@$n) {
+                $self->{"pending forks"}++;
+                $poe_kernel->yield('fork', $req);
+            }
         }
         return;
     }
@@ -855,21 +854,21 @@ sub check_scoreboard
 
 
     if( $self->is_prefork ) {
-    my $waiting=@waiting;
-    DEBUG and warn "$$: waiting=$waiting";
-    if($waiting < $self->{min_spare}) {
-        my $n=$self->{min_spare} - $waiting;
-        DEBUG_SC and 
-            warn "$$: Spawning $n spares";
-        $self->fork_off($n);
-    }
-    if($waiting > $self->{max_spare}) {
-        my $n=$waiting - $self->{max_spare};
-        DEBUG_SC and warn "$$: Killing $n spares";
-            foreach my $pid ( @waiting[0..($n-1)] ) {
-            kill SIGINT, $pid or warn "$$: killing $pid: $!";
+        my $waiting=@waiting;
+        DEBUG and warn "$$: waiting=$waiting";
+        if($waiting < $self->{min_spare}) {
+            my $n=$self->{min_spare} - $waiting;
+            DEBUG_SC and 
+                warn "$$: Spawning $n spares";
+            $self->fork_off($n);
         }
-    }
+        if($waiting > $self->{max_spare}) {
+            my $n=$waiting - $self->{max_spare};
+            DEBUG_SC and warn "$$: Killing $n spares";
+            foreach my $pid ( @waiting[0..($n-1)] ) {
+                kill SIGINT, $pid or warn "$$: killing $pid: $!";
+            }
+        }
     }
     elsif( $self->is_fork and 
                     $self->{max_children} <= keys %{$self->{children}} ) {

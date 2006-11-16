@@ -159,14 +159,10 @@ sub spawn_server
         $server="$dir/$server";
         last;
     }
-#    local $ENV{PERL5LIB}=join ':', qw(blib/lib
-#                            /home/fil/work/JAECA/JAAS/perl5lib/lib/perl5/site_p
-#                            /home/fil/work/JAECA/JAAS/perl5lib/lib/site_perl   
-#                            /home/fil/prive/perl5lib/lib/site_perl
-#                            /home/fil/prive/lib), 
-#                        ($ENV{PERL5LIB}||'~/honk');
-
-    my $exec = $Config{perl5} || $Config{perlpath};
+    my $exec = $^X || $Config{perl5} || $Config{perlpath};
+#    local $ENV{PERL5LIB}=join ':', @INC;
+#    $exec .= " ".join " ", map { "-I\Q$_" } @INC;
+    $exec .= " -Iblib/lib"; 
     if( $ENV{HARNESS_PERL_SWITCHES} ) {
         $exec .= " $ENV{HARNESS_PERL_SWITCHES}";
     }
