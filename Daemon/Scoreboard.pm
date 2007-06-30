@@ -1,4 +1,4 @@
-#$Id: Scoreboard.pm 134 2006-09-14 18:28:46Z fil $
+#$Id: Scoreboard.pm 217 2007-06-30 06:46:33Z fil $
 ########################################################
 package POE::Component::Daemon::Scoreboard;
 
@@ -25,7 +25,11 @@ sub new
 
     my $self=bless {N=>$N}, $package;
 
-    $self->{mem}=shmget(IPC_PRIVATE, $N, S_IRWXU);
+    # On linux, 2.6 kernels (at least), the first call after a reboot will
+    # fail, second and subsequent will succeed.
+    $self->{mem} = shmget(IPC_PRIVATE, $N, S_IRWXU) 
+                        || 
+                   shmget(IPC_PRIVATE, $N, S_IRWXU);
     die "$$: Unable to create shared memory: $!\n" unless $self->{mem};
 
     $self->{slots}=[reverse 0..($N-1)];
@@ -130,24 +134,4 @@ sub status
 1;
 
 __DATA__
-
-$Log$
-Revision 1.3  2006/09/14 18:28:46  fil
-Added foreign_child()
-Added HUP and TERM support
-Moved signal sending to inform_others() and expedite_signal()
-expedite_signal by-passes POE's queue, by sending signals directly to
-    watchers via ->call();
-
-Added ->peek()
-Many tweaks for preforking child
-Coverage and tests
-
-Revision 1.2  2004/10/21 03:06:19  fil
-Fixed KR_RUN_CALLED call for 5.004_05
-Improved debug output
-added daemon_accept signal
-
-Revision 1.1.1.1  2004/04/13 19:01:42  fil
-Honk
 

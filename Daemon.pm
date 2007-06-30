@@ -1,4 +1,4 @@
-#$Id: Daemon.pm 156 2006-11-09 20:24:58Z fil $
+#$Id: Daemon.pm 217 2007-06-30 06:46:33Z fil $
 ########################################################
 package POE::Component::Daemon;
 
@@ -15,7 +15,7 @@ use POE::API::Peek;
 
 use POE::Component::Daemon::Scoreboard;
 
-$VERSION = '0.1003';
+$VERSION = '0.1004';
 
 sub DEBUG () { 0 }
 sub DEBUG_SC () { DEBUG or 0 }
@@ -33,10 +33,11 @@ sub new
     }
 
     my $self=bless $param, $package;
-    $self->{package}=$package;
 
-    $package =~ s/\W+/-/g;
-    $self->{alias}||=$package;
+    $self->{package}=$package;
+    $self->{alias} = $package;
+    $self->{alias} =~ s/\W+/-/g;
+
     return $self;
 }
 
@@ -195,7 +196,6 @@ sub _start
     $kernel->sig(CHLD => 'sig_CHLD');
     $kernel->sig(HUP  => 'sig_HUP') if $self->{logfile};
     $kernel->sig(INT  => 'sig_INT'); 
-    $kernel->sig(TERM => 'sig_TERM'); 
 
     $self->inform_others( 'daemon_start' );
 
@@ -355,6 +355,9 @@ sub babysit
     }
 
     if(%rogues) {
+        # Start the rogues delay loop when going from no rogues to have 
+        # rogues
+        # NB: yield causes the event to fire after this function exits
         $kernel->yield('rogues') if not $self->{rogues};
 
         $self->{rogues}||={};
@@ -390,9 +393,9 @@ sub rogues
         my $signal;
         while(my($pid, $rogue)=each %{$self->{rogues}}) {
             $signal=0;
-            if($rogue->{tries} < 1) {       $signal=SIGINT;  }
-            elsif($rogue->{tries} < 2) {    $signal=SIGTERM; }   
-            elsif($rogue->{tries} < 3) {    $signal=SIGKILL;  }
+            if($rogue->{tries} < 1)    { $signal=SIGINT;  }
+            elsif($rogue->{tries} < 2) { $signal=SIGTERM; }
+            elsif($rogue->{tries} < 3) { $signal=SIGKILL; }
     
             if($signal) {
                 DEBUG and warn "$$: Sending signal $signal to rogue $pid";
@@ -497,12 +500,12 @@ sub fork
         warn "$$: Maximum number of children reached!";
         warn "$$: max_children=$self->{max_children} currently=".(0+keys %{$self->{children}});
 
-        # 2006/02 This is the most lamentable bit of my algorythm By
+        # 2006/02 This is the most lamentable bit of my algorythm. By
         # throwing fork events around, I could end up with too many
         # children.  Either I drop requests on the floor (bad), or I save
         # them via fork_failed, which means the events could end up in other
-        # children (less bad) or I just let them succeed and hope that >
-        # {max_children} isn't all that horrendeous (least bad so far)
+        # children (less bad) or I just let them succeed and hope that 
+        # > {max_children} isn't all that horrendeous (least bad so far)
     }
 
     my $slot=$self->{scoreboard}->add('FORK');  # grap a slot in scoreboard
@@ -741,21 +744,8 @@ sub sig_INT
 # daemontool's svc -d sends a TERM to the parent.
 # Propagate it down to the children
 # The shutdown event handler takes care of cleanup.
-sub sig_TERM
-{
-    my ($kernel, $self, $signal, $pid, $status) =  
-                @_[KERNEL, HEAP, ARG0, ARG1, ARG2];
-
-    # DEBUG and 
-        warn "$$: SIGTERM";
-    $kernel->yield('shutdown');
-    $kernel->sig_handled();         # TERM is a terminal
-    return;
-}
-
-########################################################
+#
 # Terminal signals aren't handled, so the session will stop on SIGINT.
-# The shutdown event handler takes care of cleanup.
 sub sig_TERM
 {
     my ($kernel, $self, $signal, $pid, $status) =  
@@ -764,7 +754,7 @@ sub sig_TERM
     ( DEBUG or $self->{verbose} ) and 
         warn "$$: SIGTERM";
     $kernel->yield('shutdown');
-    $kernel->sig_handled();
+    $kernel->sig_handled();     # TERM is a terminal
     return;
 }
 
@@ -812,7 +802,7 @@ sub fork_off
                 $poe_kernel->yield('fork', $req);
             }
         }
-        return;
+         return;
     }
     
     DEBUG and warn "$$: Fork off $n children";
@@ -1225,7 +1215,7 @@ pre-forking pools or post-forking (ie, fork on each request). It will also
 redirect STDERR to a log file if asked.
 
 POE::Component::Daemon also babysits child processes, handling their
-C<CHLD>.  POE::Component::Daemon can It also makes sure requests don't take
+C<CHLD>.  POE::Component::Daemon can also makes sure requests don't take
 to long.  If they do, it will try to get rid of them.  See L</BABYSITING>
 below.
 
@@ -1627,30 +1617,4 @@ This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 
 
 =cut
-
-$Log$
-Revision 1.7  2005/10/13 00:54:23  fil
-Added sig_TERM
-
-Revision 1.6  2005/09/08 23:34:40  fil
-Don't send daemon_accept just after daemon_child
-Only send daemon_accept if moving from something else to wait
-Use $Config{perl5} to run test sub-scripts
-
-Revision 1.5  2005/09/08 01:41:49  fil
-Renamed generations grand-parent, parent, child
-Added $$ to all debug messages and warnings
-Delete check_scoreboard at shutdown
-Added preforking-flow.dot and .png
-
-Revision 1.4  2004/10/21 03:06:19  fil
-Fixed KR_RUN_CALLED call for 5.004_05
-Improved debug output
-added daemon_accept signal
-
-Revision 1.3  2004/10/19 21:13:53  fil
-Updated MANIFEST
-
-Revision 1.2  2004/08/19 01:18:22  fil
-added doco
 

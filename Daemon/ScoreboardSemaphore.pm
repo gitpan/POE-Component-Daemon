@@ -1,4 +1,4 @@
-#$Id: ScoreboardSemaphore.pm 59 2004-04-13 19:01:41Z fil $
+#$Id: ScoreboardSemaphore.pm 217 2007-06-30 06:46:33Z fil $
 ########################################################
 package POE::Component::Daemon::Scoreboard;
 
@@ -187,7 +187,4 @@ sub status
 
 __DATA__
 
-$Log$
-Revision 1.1  2004/04/13 19:01:42  fil
-Initial revision
 

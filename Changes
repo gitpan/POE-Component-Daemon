@@ -1,5 +1,8 @@
 Revision history for Perl extension POE::Component::Daemon.
 
+0.1004 2007/Jun/29
+    - Clean up dupped sig_TERM
+
 0.1003 2006/Nov/15
     - Use $^X in test cases
 
