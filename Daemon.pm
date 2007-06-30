@@ -15,7 +15,7 @@ use POE::API::Peek;
 
 use POE::Component::Daemon::Scoreboard;
 
-$VERSION = '0.1004';
+$VERSION = '0.1005';
 
 sub DEBUG () { 0 }
 sub DEBUG_SC () { DEBUG or 0 }
@@ -35,8 +35,10 @@ sub new
     my $self=bless $param, $package;
 
     $self->{package}=$package;
-    $self->{alias} = $package;
-    $self->{alias} =~ s/\W+/-/g;
+    unless( $self->{alias} ) {
+        $self->{alias} = $package;
+        $self->{alias} =~ s/\W+/-/g;
+    }
 
     return $self;
 }
@@ -641,14 +643,14 @@ sub expedite_signal
     my( $self, $signal, @etc ) = @_;
 
     DEBUG and 
-        warn "Expedite signal $signal";
+        warn "$$: Expedite signal $signal";
 
     my $api = POE::API::Peek->new();
     my %watchers = $api->signal_watchers( $signal );
 
     while( my( $session, $event ) = each %watchers ) {
         DEBUG and 
-            warn "Signal $signal is $session/$event";
+            warn "$$: Signal $signal is $session/$event";
         $poe_kernel->call( $session, $event, $poe_kernel, @etc );
     }
     return;
@@ -658,7 +660,7 @@ sub inform_others
 {
     my( $self, $signal, @etc ) = @_;
 
-    DEBUG and warn "Inform others about $signal";
+    DEBUG and warn "$$: Inform others about $signal";
 
     if( ($signal eq 'daemon_child') and $self->is_fork ) {
         $self->expedite_signal( $signal, @etc );
