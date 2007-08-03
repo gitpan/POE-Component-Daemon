@@ -1,5 +1,8 @@
 Revision history for Perl extension POE::Component::Daemon.
 
+0.1006 2007/Aug/01
+    - Added daemon_HUP
+
 0.1004 2007/Jun/29
     - Clean up dupped sig_TERM
 

@@ -1,4 +1,4 @@
-#$Id: Daemon.pm 217 2007-06-30 06:46:33Z fil $
+#$Id: Daemon.pm 220 2007-08-03 02:38:12Z fil $
 ########################################################
 package POE::Component::Daemon;
 
@@ -15,7 +15,7 @@ use POE::API::Peek;
 
 use POE::Component::Daemon::Scoreboard;
 
-$VERSION = '0.1005';
+$VERSION = '0.1006';
 
 sub DEBUG () { 0 }
 sub DEBUG_SC () { DEBUG or 0 }
@@ -196,7 +196,7 @@ sub _start
 
     $kernel->sig(TERM => 'sig_TERM');
     $kernel->sig(CHLD => 'sig_CHLD');
-    $kernel->sig(HUP  => 'sig_HUP') if $self->{logfile};
+    $kernel->sig(HUP  => 'sig_HUP');
     $kernel->sig(INT  => 'sig_INT'); 
 
     $self->inform_others( 'daemon_start' );
@@ -770,6 +770,8 @@ sub sig_HUP
     ( DEBUG or $self->{verbose} ) and 
         warn "$$: SIGHUP (logfile=$self->{logfile})";
     $kernel->sig_handled();
+
+    $self->inform_others( 'daemon_HUP' );
 
     return unless $self->{logfile};
 
@@ -1594,6 +1596,10 @@ shutdown.  This might be because of code called Daemon->shutdown or because
 of TERM or INT signals.  Additionnaly, in a pre-forking server a shutdown is
 called when a child process has handled a certain number of requests.
 
+
+=head2 daemon_HUP
+
+We received a HUP signal.  Any log files should be closed then reopenned.
 
 
 =head1 BUGS
