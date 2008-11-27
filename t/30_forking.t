@@ -1,15 +1,14 @@
 #!/usr/bin/perl -w
-# $Id: 30_forking.t 216 2007-06-29 04:36:05Z fil $
+# $Id: 30_forking.t 336 2008-11-27 03:16:15Z fil $
 
 use strict;
 
 #########################
 
-use Test::More ( tests => 12 );
+use Test::More ( tests => 14 );
 
 use Config;
 use IO::Socket;
-# use Data::Denter;
 # use Religion::Package qw(1 1);
 
 
@@ -51,7 +50,7 @@ is( $PID1, $PID1, "Got the same PID");
 $P1->print("KERNEL\n");
 my $KID1=$P1->getline();
 chomp($KID1);
-
+ok( $KID1, "Got kernel ID from first server" );
 
 #########################
 my $P2=connect_server($PORT);
@@ -72,6 +71,7 @@ isnt( $PID2, $PID1, "Different PID" );
 $P2->print("KERNEL\n");
 my $KID2=$P2->getline();
 chomp($KID2);
+ok( $KID2, "Got kernel ID from second server" );
 
 isnt( $KID2, $KID1, "Different Kernel IDs" );
 

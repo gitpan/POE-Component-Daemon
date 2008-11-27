@@ -1,4 +1,4 @@
-#$Id: Daemon.pm 220 2007-08-03 02:38:12Z fil $
+#$Id: Daemon.pm 336 2008-11-27 03:16:15Z fil $
 ########################################################
 package POE::Component::Daemon;
 
@@ -15,7 +15,7 @@ use POE::API::Peek;
 
 use POE::Component::Daemon::Scoreboard;
 
-$VERSION = '0.1006';
+$VERSION = '0.1007';
 
 sub DEBUG () { 0 }
 sub DEBUG_SC () { DEBUG or 0 }
@@ -518,7 +518,8 @@ sub fork
         return;
     }
 
-    DEBUG and warn "$$: Forking a child";
+    DEBUG and 
+        warn "Forking a child";
     my $pid = fork();                   # try to fork
     unless (defined($pid)) {            # did the fork fail?
         $self->{scoreboard}->drop($slot);   # give slot back
@@ -571,6 +572,10 @@ sub become_child
 
     ( $self->{verbose} or DEBUG ) 
         and warn "$$: Created ", scalar localtime;
+
+    # This resets some kernel data that was preventing the child process's
+    # kernel from becoming IDLE
+    $poe_kernel->_data_sig_initialize;
 
 
     ## reset the kernel->ID
@@ -791,7 +796,8 @@ sub fork_off
 {
     my($self, $n)=@_;
     if(ref $n) {
-        DEBUG and warn "$$: Fork off ", (0+@$n), " children";
+        DEBUG and 
+            warn "$$: Fork off ", (0+@$n), " children";
         if( 1==@$n and $self->is_fork) {
 
             # This fork_off was probably caused by client code doing
@@ -809,7 +815,8 @@ sub fork_off
          return;
     }
     
-    DEBUG and warn "$$: Fork off $n children";
+    DEBUG and 
+        warn "$$: Fork off $n children";
     for(my $q1=0; $q1 < $n; $q1++) {
         $self->{"pending forks"}++;
         $poe_kernel->yield('fork');
@@ -915,7 +922,8 @@ sub update_status_prefork
 
     my $slot=$self->{'my slot'};
     my $current_status=$self->{scoreboard}->read($slot)||'unknown';
-    DEBUG and warn "current_status = $current_status";
+    DEBUG and 
+        warn "$$: current_status=$current_status -> status=$status";
 
     if($status eq 'wait' or $status eq 'done') {
         DEBUG and warn "$$: Moving to status=wait";
@@ -926,11 +934,12 @@ sub update_status_prefork
             $poe_kernel->yield('shutdown');
         }
         elsif($current_status ne 'w') {
+            # use Carp qw( cluck );
+            # cluck "$$: daemon_accept";
             $self->inform_others( 'daemon_accept' );
         }
         else {
             warn "Why are we moving from $current_status to $status"
-          #      unless $current_status eq 'w';
         }
         return;
     }
@@ -946,8 +955,10 @@ sub update_status_prefork
     }
 
     if($status eq 'req' or $status eq 'long') {
-        $self->{requestN}++;
-        DEBUG and warn "$$: Handling request $self->{requestN}";
+        if( $current_status ne 'r' and $current_status ne 'l' ) {
+            $self->{requestN}++;
+            DEBUG and warn "$$: Handling request $self->{requestN}";
+        }
         $self->{scoreboard}->write($slot, $status);
         return;
     }
@@ -1069,7 +1080,7 @@ sub peek
     my $api=POE::API::Peek->new();
     my @queue = $api->event_queue_dump();
     
-    my $ret = "Event Queue:\n";
+    my $ret = "Event Queue ($POE::Component::Daemon::VERSION):\n";
   
     my $events = {};
 
@@ -1102,7 +1113,7 @@ sub peek
 
             my $q1=$api->get_session_extref_count($session);
             $ref += $q1;
-            $ret.="\t\textref count: $q1\n" if $q1;
+            $ret.="\t\textref count: $q1 (Stay alive)\n" if $q1;
 
             $q1=$api->session_handle_count($session);
             $ref += $q1;  

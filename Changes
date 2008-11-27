@@ -1,5 +1,10 @@
 Revision history for Perl extension POE::Component::Daemon.
 
+0.1007 2008/Nov/25
+    - Added a call to poe_kernel->_data_sig_initialize to work around a bug
+        in POE 1.003
+    - A transition req->long or long->req no longer counted a request
+
 0.1006 2007/Aug/01
     - Added daemon_HUP
 
