@@ -7,10 +7,12 @@ eval "use ExtUtils::MakeMaker::Coverage;";
 
 
 WriteMakefile(
-    'NAME'		=> 'POE::Component::Daemon',
+    'AUTHOR'         => 'Philip Gwyn',
+    'NAME'	    	=> 'POE::Component::Daemon',
     'VERSION_FROM'	=> 'Daemon.pm', # finds $VERSION
+    'LICENSE'       => 'perl',
     'PREREQ_PM'		=> {
-        POE=>0.3202,
+        POE=>1,
         POE::API::Peek=>1        
     },
     dist=>{COMPRESS=>'gzip -9f', EXT=>'gz'},

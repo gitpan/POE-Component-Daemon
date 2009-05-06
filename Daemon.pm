@@ -1,4 +1,4 @@
-#$Id: Daemon.pm 336 2008-11-27 03:16:15Z fil $
+#$Id: Daemon.pm 479 2009-05-06 18:30:47Z fil $
 ########################################################
 package POE::Component::Daemon;
 
@@ -15,7 +15,7 @@ use POE::API::Peek;
 
 use POE::Component::Daemon::Scoreboard;
 
-$VERSION = '0.1007';
+$VERSION = '0.1008';
 
 sub DEBUG () { 0 }
 sub DEBUG_SC () { DEBUG or 0 }
@@ -1104,7 +1104,7 @@ sub peek
     }
     if($verbose) {
         $ret.="Sessions: \n" if $api->session_count;
-        foreach my $session ($api->session_list) {
+        foreach my $session ( sort { $a->ID <=> $b->ID } $api->session_list) {
             my $ref=0;
             $ret.="\tSession ".$api->session_id_loggable($session)." ($session)";
 
@@ -1137,7 +1137,7 @@ sub peek
                 $ref += $q1;
             }
 
-            my $q1 = $events->{ $session->ID }{destination};
+            $q1 = $events->{ $session->ID }{destination};
             if( $q1 ) {
                 $ret.="\t\tEvent destination count: $q1 (Stay alive)\n";
                 $ref += $q1;

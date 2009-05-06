@@ -1,4 +1,4 @@
-#$Id: Scoreboard.pm 217 2007-06-30 06:46:33Z fil $
+#$Id: Scoreboard.pm 479 2009-05-06 18:30:47Z fil $
 ########################################################
 package POE::Component::Daemon::Scoreboard;
 
@@ -10,7 +10,7 @@ use vars qw($VERSION $UNIQUE);
 use IPC::SysV qw(IPC_PRIVATE S_IRWXU IPC_CREAT SEM_UNDO);
 use Carp;
 
-$VERSION = '0.01';
+$VERSION = '0.1008';
 
 sub DEBUG () { 0 }
 
