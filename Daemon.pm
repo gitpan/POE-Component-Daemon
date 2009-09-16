@@ -1,4 +1,4 @@
-#$Id: Daemon.pm 479 2009-05-06 18:30:47Z fil $
+#$Id: Daemon.pm 548 2009-09-16 13:55:39Z fil $
 ########################################################
 package POE::Component::Daemon;
 
@@ -15,7 +15,7 @@ use POE::API::Peek;
 
 use POE::Component::Daemon::Scoreboard;
 
-$VERSION = '0.1008';
+$VERSION = '0.1100';
 
 sub DEBUG () { 0 }
 sub DEBUG_SC () { DEBUG or 0 }
@@ -111,6 +111,9 @@ sub detach
             DEBUG and warn "$$: We are the $gen";
             POSIX::setsid() or 
                 warn "$$: Unable to setsid(): $! (continuing anyway)";
+            if( $poe_kernel->can( 'has_forked' ) ) {
+                $poe_kernel->has_forked;
+            }
             return 1;
          }
     }
@@ -137,8 +140,8 @@ sub create_session
                         babysit rogues shutdown
                         foreign_child
                         sig_CHLD sig_INT sig_TERM sig_HUP
-                        )]
-            ]);
+                      )]
+            ])->ID;
 }
 
 ########################################################
@@ -195,7 +198,6 @@ sub _start
     $Daemon::alias=$self->{alias};
 
     $kernel->sig(TERM => 'sig_TERM');
-    $kernel->sig(CHLD => 'sig_CHLD');
     $kernel->sig(HUP  => 'sig_HUP');
     $kernel->sig(INT  => 'sig_INT'); 
 
@@ -447,13 +449,13 @@ sub shutdown
     if($self->{children}) {         # tell children to go away
         foreach my $pid (keys %{$self->{children}}) {
             kill SIGTERM, $pid
-                    or warn "$$: Killing $pid: $!";
+                    or warn "$$: Unable to kill $pid: $!";
         }
     }
     if($self->{foreign_children}) { # tell foreign children to go away
         foreach my $pid (keys %{$self->{foreign_children}}) {
             kill SIGTERM, $pid
-                    or warn "$$: Killing $pid: $!";
+                    or warn "$$: Unable to kill $pid: $!";
         }
     }
 
@@ -533,6 +535,8 @@ sub fork
             warn "$$: Parent server forked a new child.  children: (",
                     join(' ', sort keys %{$self->{children}}), ")";
 
+        $kernel->sig_child( $pid => 'sig_CHLD');
+
         if( not $self->{"pending forks"} and $self->{startup} ) {
             # End if pre-forking startup time.
             $self->{startup}=0;
@@ -575,8 +579,15 @@ sub become_child
 
     # This resets some kernel data that was preventing the child process's
     # kernel from becoming IDLE
-    $poe_kernel->_data_sig_initialize;
-
+    if( $poe_kernel->can( 'has_forked' ) ) {
+        $poe_kernel->has_forked;
+    }
+    else {
+        $poe_kernel->_data_sig_initialize;
+    }
+    # This resets some kernel data that was preventing the child process
+    # from handling CHLD
+    # $poe_kernel->_data_sig_cease_polling;
 
     ## reset the kernel->ID
     # Force each process to have a unique ID.  IKC depends on unique IDs
@@ -1174,9 +1185,9 @@ POE::Component::Daemon - Handles all the housework for a daemon.
 
 =head1 SYNOPSIS
 
-  use POE::Component::Daemon;
+    use POE::Component::Daemon;
 
-  POE::Component::Daemon->spawn(detach=>1, max_children=>3);
+    POE::Component::Daemon->spawn(detach=>1, max_children=>3);
 
 
     # Create a session that uses SocketFactory
@@ -1362,6 +1373,8 @@ Patches welcome.
 
     POE::Component::Daemon->spawn( %params );
 
+Where C<%params> may contain:
+
 =over 4
 
 =item alias
@@ -1444,7 +1457,7 @@ parent process, it sends a C<TERM> signal to all child processes.
 
 =head2 update_status
 
-    Daemon->status( $new_status, $data )
+    Daemon->update_status( $new_status, $data )
     $poe_kernel->post( Daemon=>'update_status', $new_status, $data );
 
 Tell POE::Component::Daemon your new status.  C<$new_status> is one of the scoreboards
@@ -1630,7 +1643,7 @@ Philip Gwyn, E<lt>gwyn -AT- cpan.orgE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2004-2006 by Philip Gwyn
+Copyright 2004-2009 by Philip Gwyn
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 

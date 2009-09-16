@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id: preforking 134 2006-09-14 18:28:46Z fil $
+# $Id: preforking 548 2009-09-16 13:55:39Z fil $
 use strict;
 
 # use Religion::Package qw(1 1);
@@ -10,44 +10,35 @@ use POE::Driver::SysRW;
 use POE::Filter::Line;
 use POE::Wheel::ReadWrite;
 use POSIX qw(EADDRINUSE);
-use Socket qw(inet_ntoa);
+use Socket qw(inet_ntoa sockaddr_in);
 use FindBin;
 
 sub DEBUG () { 0 }
 
 my $port=shift;
-die "Usage: $0 port" unless $port;
+die "Usage: $0 port" unless defined $port;
 
 my $logfile = "$FindBin::Dir/log_preforking";
 
 #########################
-POE::Component::Daemon->spawn(
-            alias=>'Daemon',
-            logfile=>$logfile,
-            detach=>1,
-            start_children=>1,
-            requests=>1,
-            min_spare=>2,
-            max_children=>10,
-        );
-
-
-
-
-#########################
 POE::Session->create(
 inline_states=>{
-
     _start=>sub {
             my($kernel, $heap)=@_[KERNEL, HEAP];
             $heap->{wheel}=POE::Wheel::SocketFactory->new(
-                BindPort=>$port,
-                Reuse          => 'on',                # Lets the port be reused
-                BindAddress=>'127.0.0.1',
-                SuccessEvent=>'accept',  
-                FailureEvent=>'error',
+                BindPort    => $port,
+                Reuse       => 'on',                # Lets the port be reused
+                BindAddress => '127.0.0.1',
+                SuccessEvent => 'accept',  
+                FailureEvent => 'error',
             );
-            warn "$$: Listening on port $port";
+            if( $port == 0 ) {
+                $port = ( sockaddr_in($heap->{wheel}->getsockname()) )[0];
+                print "PORT=$port\n";
+            }
+            else {
+                warn "$$: Listening on port $port";
+            }
             $heap->{wheel}->pause_accept(); # is resumed in started
 
             $kernel->sig('daemon_child'=>'started');
@@ -198,6 +189,21 @@ inline_states=>{
 
 });      
 
+#########################
+POE::Component::Daemon->spawn(
+            alias   => 'Daemon',
+            logfile => $logfile,
+            detach  => 1,
+            verbose => 1,
+            start_children  => 1,
+            requests        => 1,
+            min_spare       => 2,
+            max_children    => 10,
+        );
+
+
+
+
 
 
 #########################
@@ -205,26 +211,4 @@ $poe_kernel->run();
 
 warn "$$: Exiting";
 1;
-
-__END__
-
-$Log$
-Revision 1.3  2006/09/14 18:28:46  fil
-Added foreign_child()
-Added HUP and TERM support
-Moved signal sending to inform_others() and expedite_signal()
-expedite_signal by-passes POE's queue, by sending signals directly to
-    watchers via ->call();
-
-Added ->peek()
-Many tweaks for preforking child
-Coverage and tests
-
-Revision 1.2  2004/10/21 03:06:19  fil
-Fixed KR_RUN_CALLED call for 5.004_05
-Improved debug output
-added daemon_accept signal
-
-Revision 1.1.1.1  2004/04/13 19:01:42  fil
-Honk
 

@@ -1,5 +1,10 @@
 Revision history for Perl extension POE::Component::Daemon.
 
+0.1100 2009/Sep/16
+    - Use Port=>0 so that the OS assigns us a port number.  This way
+        maybe we won't always fail on darwin.
+    - use POE::Kernel->sig_child()
+
 0.1008 2009/May/6
     - Make CPANTS happier
 

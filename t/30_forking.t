@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id: 30_forking.t 336 2008-11-27 03:16:15Z fil $
+# $Id: 30_forking.t 548 2009-09-16 13:55:39Z fil $
 
 use strict;
 
@@ -7,16 +7,12 @@ use strict;
 
 use Test::More ( tests => 14 );
 
-use Config;
-use IO::Socket;
-# use Religion::Package qw(1 1);
-
-
+use t::Test;
+use POSIX qw( SIGTERM SIGHUP );
 pass( 'loaded' );
 
 #########################
-my $PORT=33140;
-spawn_server('forking', $PORT);
+my $PORT = spawn_server('forking', 0);
 my $P1=connect_server($PORT);
 
 #########################
@@ -135,69 +131,7 @@ ok( $P1, "Max 3 children" );
 #########################
 $P2->print("DONE\n");
 
-# warn "Parent is $PID4";
-kill 15, $PID4 if $PID4;
+diag "Parent is $PID4";
+kill SIGTERM, $PID4 if $PID4;
 # system("killall forking");
-
-#########################################
-sub my_sleep
-{
-    my( $seconds ) = @_;
-    if( $ENV{HARNESS_PERL_SWITCHES} ) {
-        $seconds *= 10;
-    }
-    diag( "sleep $seconds" );
-    sleep $seconds;
-}
-
-#########################################
-sub spawn_server
-{
-    my ($server, @args)=@_;
-    foreach my $dir ('../jaeca', '.') {
-        next unless -x "$dir/$server";
-        $server="$dir/$server";
-        last;
-    }
-    my $exec = $^X || $Config{perl5} || $Config{perlpath};
-#    local $ENV{PERL5LIB}=join ':', @INC;
-#    $exec .= " ".join " ", map { "-I\Q$_" } @INC;
-    $exec .= " -Iblib/lib"; 
-    if( $ENV{HARNESS_PERL_SWITCHES} ) {
-        $exec .= " $ENV{HARNESS_PERL_SWITCHES}";
-    }
-
-    $exec .= join ' ', '', $server, @args;
-
-    system( $exec )==0
-        or die "Unable to launch $exec: $?\n";
-
-    my_sleep( 2 );
-}
-
-#########################################
-sub connect_server
-{
-    my($port, $failure_ok)=@_;
-    $!=0;
-    my $io=IO::Socket::INET->new( PeerAddr => "localhost:$port" );
-
-    die "Can't connect to localhost:$port ($!) Maybe server startup failed?"
-            unless $io or $failure_ok;
-    return $io;
-}
-
-__END__
-
-$Log$
-Revision 1.1  2006/09/14 18:28:46  fil
-Added foreign_child()
-Added HUP and TERM support
-Moved signal sending to inform_others() and expedite_signal()
-expedite_signal by-passes POE's queue, by sending signals directly to
-    watchers via ->call();
-
-Added ->peek()
-Many tweaks for preforking child
-Coverage and tests
 

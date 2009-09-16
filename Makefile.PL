@@ -12,8 +12,8 @@ WriteMakefile(
     'VERSION_FROM'	=> 'Daemon.pm', # finds $VERSION
     'LICENSE'       => 'perl',
     'PREREQ_PM'		=> {
-        POE=>1,
-        POE::API::Peek=>1        
+        POE            => 1,
+        POE::API::Peek => 1        
     },
     dist=>{COMPRESS=>'gzip -9f', EXT=>'gz'},
 );

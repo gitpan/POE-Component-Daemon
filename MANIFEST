@@ -16,4 +16,5 @@ t/10_scoreboard.t
 t/11_daemon.t
 t/20_preforking.t
 t/30_forking.t
+t/Test.pm
 META.yml                                 Module meta-data (added by MakeMaker)

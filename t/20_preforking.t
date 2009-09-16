@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id: 20_preforking.t 216 2007-06-29 04:36:05Z fil $
+# $Id: 20_preforking.t 549 2009-09-16 14:05:03Z fil $
 
 use strict;
 
@@ -7,14 +7,13 @@ use strict;
 
 use Test::More ( tests=>16 );
 
-use Config;
-use IO::Socket;
+use t::Test;
+use POSIX qw( SIGHUP SIGTERM );
 
 pass( "loaded" );
 
 #########################
-my $PORT=33140;
-spawn_server('preforking', $PORT);
+my $PORT = spawn_server('preforking', 0);
 
 my $P1 = connect_server($PORT);
 my $P2 = connect_server($PORT);
@@ -51,11 +50,9 @@ rename $file, $file2;
 ok( (-f $file2), "Moved the log file" ) 
     or diag( "Unable to move $file to $file2: $!" );
 
-kill 1, $PID1;
-my_sleep( 1 );
+kill SIGHUP, $PID1;
+my_sleep( 3 );
 ok( ($file and -f $file), "Created a new logfile" );
-
-
 
 END { unlink $file if $file }
 END { unlink $file2 if $file2 }
@@ -129,73 +126,5 @@ $P2->print("PARENT\n");
 my $PID3 = $P2->getline();
 chomp( $PID3 );
 
-# warn "Parent is $PID3";
-kill 15, $PID3 if $PID3;
-
-
-
-
-
-
-#########################################
-sub my_sleep
-{
-    my( $seconds ) = @_;
-    if( $ENV{HARNESS_PERL_SWITCHES} ) {
-        $seconds *= 10;
-    }
-    diag( "sleep $seconds" );
-    sleep $seconds;
-}
-
-#########################################
-sub spawn_server
-{
-    my ($server, @args)=@_;
-    foreach my $dir ('../jaeca', '.') {
-        next unless -x "$dir/$server";
-        $server="$dir/$server";
-        last;
-    }
-    my $exec = $^X || $Config{perl5} || $Config{perlpath};
-#    local $ENV{PERL5LIB}=join ':', @INC;
-#    $exec .= " ".join " ", map { "-I\Q$_" } @INC;
-    $exec .= " -Iblib/lib"; 
-    if( $ENV{HARNESS_PERL_SWITCHES} ) {
-        $exec .= " $ENV{HARNESS_PERL_SWITCHES}";
-    }
-
-    $exec .= join ' ', '', $server, @args;
-
-    system( $exec )==0
-        or die "Unable to launch $exec: $?\n";
-
-    my_sleep( 2 );
-}
-
-#########################################
-sub connect_server
-{
-    my($port)=@_;
-    $!=0;
-    my $io=IO::Socket::INET->new(PeerAddr=>"localhost:$port");
-
-    die "Can't connect to localhost:$port ($!) Maybe server startup failed?"
-            unless $io;
-    return $io;
-}
-
-__END__
-
-$Log$
-Revision 1.1  2006/09/14 18:28:46  fil
-Added foreign_child()
-Added HUP and TERM support
-Moved signal sending to inform_others() and expedite_signal()
-expedite_signal by-passes POE's queue, by sending signals directly to
-    watchers via ->call();
-
-Added ->peek()
-Many tweaks for preforking child
-Coverage and tests
-
+diag "Parent is $PID3";
+kill SIGTERM, $PID3 if $PID3;
