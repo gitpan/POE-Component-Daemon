@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id: 30_forking.t 548 2009-09-16 13:55:39Z fil $
+# $Id: 30_forking.t 704 2010-12-15 20:29:47Z fil $
 
 use strict;
 
