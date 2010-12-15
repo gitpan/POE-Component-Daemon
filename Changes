@@ -1,5 +1,11 @@
 Revision history for Perl extension POE::Component::Daemon.
 
+0.1200 2010/Dec/13
+    - shutdown is also a signal
+    - only remove alias once
+    - tweak verbose cookie crumbs
+    - moved clutter into eg/
+
 0.1100 2009/Sep/16
     - Use Port=>0 so that the OS assigns us a port number.  This way
         maybe we won't always fail on darwin.

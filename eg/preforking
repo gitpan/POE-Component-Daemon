@@ -41,11 +41,11 @@ inline_states=>{
             }
             $heap->{wheel}->pause_accept(); # is resumed in started
 
-            $kernel->sig('daemon_child'=>'started');
-            $kernel->sig('daemon_parent'=>'we_are_parent');
-            $kernel->sig('daemon_accept'=>'accepting');
+            $kernel->sig('daemon_child'=>'daemon_child');
+            $kernel->sig('daemon_parent'=>'daemon_parent');
+            $kernel->sig('daemon_accept'=>'daemon_accept');
 
-            $kernel->sig('daemon_shutdown'=>'game_over');
+            $kernel->sig('daemon_shutdown'=>'daemon_shutdown');
 
             $heap->{parent} = 0;
             $heap->{rid}=0;
@@ -69,7 +69,7 @@ inline_states=>{
 
     ###############
     ## Called when we switch to a child process
-    started=>sub {
+    daemon_child=>sub {
         my($kernel, $heap)=@_[KERNEL, HEAP];
         DEBUG and 
             warn "Started (parent=$heap->{parent})";
@@ -79,7 +79,7 @@ inline_states=>{
 
     ###############
     ## Called when a child process set status to 'wait'
-    accepting=>sub {
+    daemon_accept=>sub {
         my($kernel, $heap)=@_[KERNEL, HEAP];
         DEBUG and 
             warn "Accepting (parent=$heap->{parent})";
@@ -90,7 +90,7 @@ inline_states=>{
     ###############
     ## PoCo::Daemon's daemon_parent.  We are a parent process, after the
     ## initial children are forked off.
-    we_are_parent=>sub {
+    daemon_parent=>sub {
         my($kernel, $heap)=@_[KERNEL, HEAP];
         DEBUG and warn "PARENT";
         $heap->{parent} = $$;
@@ -106,7 +106,7 @@ inline_states=>{
         # DEBUG and 
             warn "Connection id=$id from $peer:$port";
     
-        $heap->{wheel}->pause_accept(); # is resumed in started
+        $heap->{wheel}->pause_accept(); # is resumed in started 
         my $info={handle=>$handle, peer=>$peer, port=>$port, id=>$id};
         Daemon->update_status('req');
 
@@ -177,10 +177,10 @@ inline_states=>{
     ################
     ## daemon_shutdown signal.  Sent when we get at TERM or INT, or when
     ## we handle enough requests to be recycled.
-    game_over => sub {
+    daemon_shutdown => sub {
         my($heap)=$_[HEAP];
 
-        DEBUG and warn "$$: game_over\n";
+        DEBUG and warn "$$: daemon_shutdown\n";
 
         delete $heap->{wheel};
         delete $heap->{wheel_client};

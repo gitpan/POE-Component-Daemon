@@ -1,4 +1,4 @@
-#$Id: Daemon.pm 548 2009-09-16 13:55:39Z fil $
+#$Id: Daemon.pm 686 2010-12-15 13:58:29Z fil $
 ########################################################
 package POE::Component::Daemon;
 
@@ -12,10 +12,11 @@ use POE;
 use Carp;
 use Data::Dumper;
 use POE::API::Peek;
+use Scalar::Util qw( blessed );
 
 use POE::Component::Daemon::Scoreboard;
 
-$VERSION = '0.1100';
+$VERSION = '0.1200';
 
 sub DEBUG () { 0 }
 sub DEBUG_SC () { DEBUG or 0 }
@@ -197,6 +198,7 @@ sub _start
     $kernel->alias_set($self->{alias});
     $Daemon::alias=$self->{alias};
 
+    $kernel->sig(shutdown => 'shutdown');
     $kernel->sig(TERM => 'sig_TERM');
     $kernel->sig(HUP  => 'sig_HUP');
     $kernel->sig(INT  => 'sig_INT'); 
@@ -441,7 +443,8 @@ sub shutdown
 {
     my($self, $kernel)=@_[OBJECT, KERNEL];
 
-    DEBUG and warn "$$: shutdown";
+    $self->{verbose} and 
+        warn "$$: shutdown";
     if($self->{rogues}) {
         $kernel->delay('rogues');   # we no longer care about rogues
     }
@@ -465,7 +468,7 @@ sub shutdown
         delete $self->{'my slot'};
     }
 
-    $kernel->alias_remove($self->{alias});
+    $kernel->alias_remove(delete $self->{alias}) if $self->{alias};
     $kernel->delay('waste_time');           # get it OVER with
     $kernel->delay('check_scoreboard');     # get it OVER with
     $self->{'die'}=1;                       # prevent race conditions
@@ -521,7 +524,7 @@ sub fork
     }
 
     DEBUG and 
-        warn "Forking a child";
+        warn "$$: Forking a child";
     my $pid = fork();                   # try to fork
     unless (defined($pid)) {            # did the fork fail?
         $self->{scoreboard}->drop($slot);   # give slot back
@@ -676,7 +679,8 @@ sub inform_others
 {
     my( $self, $signal, @etc ) = @_;
 
-    DEBUG and warn "$$: Inform others about $signal";
+    $self->{verbose} and 
+        warn "$$: Inform others about $signal";
 
     if( ($signal eq 'daemon_child') and $self->is_fork ) {
         $self->expedite_signal( $signal, @etc );
@@ -841,7 +845,7 @@ sub fork_off
 sub check_scoreboard
 {
     my($self)=@_;
-    DEBUG and warn "check_scoreboard";
+    DEBUG and warn "$$: check_scoreboard";
 
     if($self->{'is a child'}) {
         DEBUG and warn "$$: I am a child!  I refuse to check the scoreboard!";
@@ -1056,6 +1060,7 @@ use strict;
 use POE;
 
 use POE::API::Peek;
+use Scalar::Util qw( blessed );
 
 use vars qw($alias);
 
@@ -1088,6 +1093,7 @@ sub peek
 {
     my($package, $verbose)=@_;
 
+    my $self;
     my $api=POE::API::Peek->new();
     my @queue = $api->event_queue_dump();
     
@@ -1113,6 +1119,8 @@ sub peek
             $ret .= "\n";
         }
     }
+    $ret .="\tEMPTY\n" unless @queue;
+
     if($verbose) {
         $ret.="Sessions: \n" if $api->session_count;
         foreach my $session ( sort { $a->ID <=> $b->ID } $api->session_list) {
@@ -1157,9 +1165,26 @@ sub peek
             if($refcount != $ref) {
                 $ret.="\t\tStay alive: refcount=$refcount counted=$ref\n";
             }  
+            if( $alias and grep $alias, @aliases ) {
+                my $state = $session->[ POE::Session::SE_STATES ]{_start};
+                if( $state and 'ARRAY' eq ref $state and blessed $state->[0] ) {
+                    $self = $state->[0];
+                }
+            }
         }
     }
+
     $ret.="\n";
+
+    if( blessed $self ) {
+        if( $self->{'my slot'} ) {
+            my $status = $self->{scoreboard}->read($self->{'my slot'});
+            $ret .= "Scoreboard slot: $self->{'my slot'}\n";
+            $ret .= "Scoreboard: $status\n";
+        }
+        $ret .= $self->{scoreboard}->status;
+        $ret.="\n\n";
+    }
 
     $poe_kernel->sig_handled;
 
@@ -1448,10 +1473,12 @@ above.
 
     Daemon->shutdown;
     $poe_kernel->post( Daemon=>'shutdown' );
+    $poe_kernel->signal( $poe_kernel=>'shutdown' );
 
-Tell POE::Component::Daemon to shutdown.  POE::Component::Daemon responds by cleaning up all
-traces in the kernel and broadcasting the L</daemon_shutdown> signal.  In the
-parent process, it sends a C<TERM> signal to all child processes.
+Tell POE::Component::Daemon to shutdown.  POE::Component::Daemon responds by
+cleaning up all traces in the kernel and broadcasting the
+L</daemon_shutdown> signal.  In the parent process, it sends a C<TERM>
+signal to all child processes.
 
 
 
@@ -1643,7 +1670,7 @@ Philip Gwyn, E<lt>gwyn -AT- cpan.orgE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2004-2009 by Philip Gwyn
+Copyright 2004-2010 by Philip Gwyn
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 
