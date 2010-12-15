@@ -1,5 +1,9 @@
 Revision history for Perl extension POE::Component::Daemon.
 
+0.1201 2010/Dec/13
+    - Fixed test cases!
+    - Stronger exit code for detach
+
 0.1200 2010/Dec/13
     - shutdown is also a signal
     - only remove alias once

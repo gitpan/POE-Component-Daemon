@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               POE-Component-Daemon
-version:            0.1200
+version:            0.1201
 abstract:           ~
 author:
     - Philip Gwyn

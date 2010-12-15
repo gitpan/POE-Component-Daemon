@@ -1,4 +1,4 @@
-#$Id: Daemon.pm 686 2010-12-15 13:58:29Z fil $
+#$Id: Daemon.pm 700 2010-12-15 16:43:10Z fil $
 ########################################################
 package POE::Component::Daemon;
 
@@ -16,7 +16,7 @@ use Scalar::Util qw( blessed );
 
 use POE::Component::Daemon::Scoreboard;
 
-$VERSION = '0.1200';
+$VERSION = '0.1201';
 
 sub DEBUG () { 0 }
 sub DEBUG_SC () { DEBUG or 0 }
@@ -124,7 +124,34 @@ sub detach
     ${$poe_kernel->[POE::Kernel::KR_RUN]} |=
                                 POE::Kernel::KR_RUN_CALLED;
 
-    exit 0;
+    # This code is lifted from POE::Wheel::Run::_exit_child_any_way_we_can
+    my $exitval = 0;
+
+    # First make sure stdio are flushed.
+    close STDIN  if defined fileno(STDIN); # Voodoo?
+    close STDOUT if defined fileno(STDOUT);
+    close STDERR if defined fileno(STDERR);
+
+    # On Windows, subprocesses run in separate threads.  All the "fancy"
+    # methods act on entire processes, so they also exit the parent.
+
+    unless (POE::Kernel::RUNNING_IN_HELL) {
+      # Try to avoid triggering END blocks and object destructors.
+      eval { POSIX::_exit( $exitval ); };
+
+      # TODO those methods will not exit with $exitval... what to do?
+      eval { CORE::kill KILL => $$; };
+      eval { exec("$^X -e 0"); };
+    } else {
+      eval { CORE::kill( KILL => $$ ); };
+
+      # TODO Interestingly enough, the KILL is not enough to terminate this process.
+      # However, it *is* enough to stop execution of END blocks/etc
+      # So we will end up falling through to the exit( $exitval ) below
+    }
+
+    # Do what we must.
+    exit( $exitval ); 
 }
 
 ########################################################

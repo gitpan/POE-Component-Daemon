@@ -12,7 +12,7 @@ use POSIX qw( SIGTERM SIGHUP );
 pass( 'loaded' );
 
 #########################
-my $PORT = spawn_server('forking', 0);
+my $PORT = spawn_server('eg/forking', 0);
 my $P1=connect_server($PORT);
 
 #########################

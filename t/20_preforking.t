@@ -13,7 +13,7 @@ use POSIX qw( SIGHUP SIGTERM );
 pass( "loaded" );
 
 #########################
-my $PORT = spawn_server('preforking', 0);
+my $PORT = spawn_server('eg/preforking', 0);
 
 my $P1 = connect_server($PORT);
 my $P2 = connect_server($PORT);

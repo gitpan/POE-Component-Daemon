@@ -1,4 +1,4 @@
-#$Id: ScoreboardSemaphore.pm 548 2009-09-16 13:55:39Z fil $
+#$Id: ScoreboardSemaphore.pm 700 2010-12-15 16:43:10Z fil $
 ########################################################
 package POE::Component::Daemon::Scoreboard;
 
