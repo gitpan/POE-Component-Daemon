@@ -1,4 +1,4 @@
-#$Id: Daemon.pm 704 2010-12-15 20:29:47Z fil $
+#$Id: Daemon.pm 731 2011-01-06 19:38:11Z fil $
 ########################################################
 package POE::Component::Daemon;
 
@@ -16,7 +16,7 @@ use Scalar::Util qw( blessed );
 
 use POE::Component::Daemon::Scoreboard;
 
-$VERSION = '0.1202';
+$VERSION = '0.1203';
 
 sub DEBUG () { 0 }
 sub DEBUG_SC () { DEBUG or 0 }
