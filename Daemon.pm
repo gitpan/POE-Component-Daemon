@@ -1,4 +1,4 @@
-#$Id: Daemon.pm 731 2011-01-06 19:38:11Z fil $
+#$Id: Daemon.pm 761 2011-05-18 18:37:53Z fil $
 ########################################################
 package POE::Component::Daemon;
 
@@ -11,15 +11,22 @@ use POSIX qw(EAGAIN ECHILD SIGINT SIGKILL SIGTERM);
 use POE;
 use Carp;
 use Data::Dumper;
-use POE::API::Peek;
 use Scalar::Util qw( blessed );
 
 use POE::Component::Daemon::Scoreboard;
 
-$VERSION = '0.1203';
+$VERSION = '0.1300';
 
 sub DEBUG () { 0 }
 sub DEBUG_SC () { DEBUG or 0 }
+
+our $NO_PEEK;
+BEGIN {
+    eval 'use POE::API::Peek;';
+    $NO_PEEK = $@ if $@;
+    # warn $NO_PEEK;
+}
+
 
 ########################################################
 sub new
@@ -328,7 +335,8 @@ sub babysit
                 my $t=waitpid($pid, POSIX::WNOHANG());
                 if($t==$pid) {
                     # process was reaped, now fake a SIGCHLD
-                    DEBUG and warn "$$: Faking a CHLD for $pid";
+                    # DEBUG and 
+                        warn "$$: Faking a CHLD for $pid";
                     $kernel->yield('sig_CHLD', 'CHLD', $pid, $?, 1);
                     $ok{$pid}=1;
                 } else {
@@ -375,8 +383,9 @@ sub babysit
 
     # if a process is MIA, we fake a death, and spawn a new child (if needs be)
     foreach my $pid (keys %missing) {
+        #$self->{verbose} and 
+            warn "$$: Faking a CHLD for $pid MIA";
         $kernel->yield('sig_CHLD', 'CHLD', $pid, 0, 1);
-        $self->{verbose} and warn "$$: Faking a CHLD for $pid MIA";
     }
 
     # we could do the same thing for rogue processes, but instead we
@@ -441,7 +450,8 @@ sub rogues
                 # if SIGKILL didn't work, it's beyond hope!
                 $kernel->yield('sig_CHLD', 'CHLD', $pid, 0, 1);
                 delete $self->{rogues}{$pid};
-                $self->{verbose} and warn "$$: Faking a CHLD for rogue $pid";
+                # $self->{verbose} and 
+                    warn "$$: Faking a CHLD for rogue $pid";
             }
             $rogue->{tries}++;
         }
@@ -466,6 +476,11 @@ sub _stop
 
 ########################################################
 # Someone wants us to exit... oblige
+sub do_shutdown
+{
+    # print STDERR "$$: do_shutdown\n";
+    $poe_kernel->call( $poe_kernel->get_active_session, 'shutdown' );
+}
 sub shutdown
 {
     my($self, $kernel)=@_[OBJECT, KERNEL];
@@ -478,6 +493,7 @@ sub shutdown
 
     if($self->{children}) {         # tell children to go away
         foreach my $pid (keys %{$self->{children}}) {
+            $self->{verbose} and warn "$$: TERM $pid";
             kill SIGTERM, $pid
                     or warn "$$: Unable to kill $pid: $!";
         }
@@ -560,6 +576,7 @@ sub fork
     }
 
     if ($pid) {                         # successful fork; parent keeps track
+        #print STDERR "$$: parent pid=$pid\n";
         $self->{children}->{$pid} = $slot;
         DEBUG and
             warn "$$: Parent server forked a new child.  children: (",
@@ -574,6 +591,7 @@ sub fork
         }
     }
     else {                              # child becomes a child process
+        $self->has_forked;
         $self->{scoreboard}->write( $slot, 'fork' );
         $self->become_child( $slot, $req );
     }
@@ -598,6 +616,13 @@ sub fork_failed
     return;
 }
 
+sub has_forked
+{
+    # This resets some kernel data that was preventing the child
+    # process's kernel from becoming IDLE
+    $poe_kernel->has_forked;
+}
+
 ########################################################
 # Turn ourselves into a child process
 sub become_child
@@ -606,22 +631,17 @@ sub become_child
 
     ( $self->{verbose} or DEBUG ) 
         and warn "$$: Created ", scalar localtime;
-
-    # This resets some kernel data that was preventing the child process's
-    # kernel from becoming IDLE
-    if( $poe_kernel->can( 'has_forked' ) ) {
-        $poe_kernel->has_forked;
-    }
-    else {
-        $poe_kernel->_data_sig_initialize;
-    }
     # This resets some kernel data that was preventing the child process
     # from handling CHLD
     # $poe_kernel->_data_sig_cease_polling;
 
     ## reset the kernel->ID
     # Force each process to have a unique ID.  IKC depends on unique IDs
-    $poe_kernel->[ POE::Kernel::KR_ID ] = undef();
+#    unless( $poe_kernel->can( 'has_forked' ) ) {
+#        $poe_kernel->[ POE::Kernel::KR_ID ] = undef();
+#    }
+    # Above is for Olde Schoole, pre-has_forked() POE
+    
 
     ## Clean out stuff that the parent needs but not the children
 
@@ -684,6 +704,7 @@ sub retry
 # $poe_kernel->signal() simply places an event on the queue. This means that
 # they get handled during the select loop, which is a bad thing for
 # 'daemon_child' in a forking server.
+# Note that it requires POE::API::Peek, which is currently broken for 1.300+
 sub expedite_signal
 {
     my( $self, $signal, @etc ) = @_;
@@ -709,7 +730,8 @@ sub inform_others
     $self->{verbose} and 
         warn "$$: Inform others about $signal";
 
-    if( ($signal eq 'daemon_child') and $self->is_fork ) {
+    if( !$NO_PEEK and ($signal eq 'daemon_shutdown' or
+            ($signal eq 'daemon_child') and $self->is_fork) ) {
         $self->expedite_signal( $signal, @etc );
     }
     else {
@@ -744,6 +766,9 @@ sub sig_CHLD
     }
 
     return if $self->{"is a child"};
+
+#    ( DEBUG or $self->{verbose} ) and 
+        warn "$$: SIGCHLD pid=$pid";
 
     ##########
     if($self->{children}) {
@@ -784,7 +809,7 @@ sub sig_INT
 
     ( DEBUG or $self->{verbose} ) and 
         warn "$$: SIGINT";
-    $kernel->yield('shutdown');
+    $self->do_shutdown;
     $kernel->sig_handled();         # INT is a terminal
     return;
 }
@@ -802,7 +827,7 @@ sub sig_TERM
 
     ( DEBUG or $self->{verbose} ) and 
         warn "$$: SIGTERM";
-    $kernel->yield('shutdown');
+    $self->do_shutdown;
     $kernel->sig_handled();     # TERM is a terminal
     return;
 }
@@ -934,10 +959,10 @@ sub check_scoreboard
 sub update_status
 {
     my($self, $status, $parm)=@_[OBJECT, ARG0, ARG1];
-    DEBUG and warn "$$: Update status status=$status parm=$parm";
+    DEBUG and warn "$$: Update status status=$status parm=(",($parm||''),")";
 
     if($self->is_prefork) {
-        return $self->update_status_prefork($status, $parm);
+        return $self->update_status_prefork($status, $parm, @_[CALLER_FILE, CALLER_LINE]);
     }
 
     elsif($self->is_fork) {
@@ -956,13 +981,18 @@ sub update_status
 # User code in a preforked child wants to update the status
 sub update_status_prefork
 {
-    my($self, $status, $parm)=@_;
+    my($self, $status, $parm, $file, $line)=@_;
+    return if $self->{'die'};
+
     unless($self->{'is a child'}) {
         warn "$$: Only child processes should update their status ($status)";
         return;
     }
 
     my $slot=$self->{'my slot'};
+    unless( defined $slot ) {
+        die "$$: Missing slot.  Update sent from $file line $line.\n" 
+    }
     my $current_status=$self->{scoreboard}->read($slot)||'unknown';
     DEBUG and 
         warn "$$: current_status=$current_status -> status=$status";
@@ -972,8 +1002,8 @@ sub update_status_prefork
         $self->{scoreboard}->write($slot, 'wait');
         if($self->{requestN} >= $self->{'max requests'}) {
             DEBUG and 
-                warn "$$: Handled $self->{requestN} requests, shutting down";
-            $poe_kernel->yield('shutdown');
+                warn "$$: Handled $self->{requestN} requests, shutting down status=$status";
+            $self->do_shutdown;
         }
         elsif($current_status ne 'w') {
             # use Carp qw( cluck );
@@ -981,7 +1011,8 @@ sub update_status_prefork
             $self->inform_others( 'daemon_accept' );
         }
         else {
-            warn "Why are we moving from $current_status to $status"
+            warn "Why are we moving from $current_status to $status.".
+                 "  Update sent from $file line $line.\n";
         }
         return;
     }
@@ -1013,15 +1044,19 @@ sub update_status_prefork
 sub update_status_fork_child
 {
     my($self, $status, $parm)=@_;
+    return if $self->{'die'};
 
     my $slot=$self->{'my slot'};
-    die "NO SLOT" unless defined $slot;
+    unless( defined $slot ) {
+        warn "$$: NO SLOT for status=$status";
+        return;
+    }
 
     my $current_status=$self->{scoreboard}->read($slot);
 
     if($status eq 'wait' or $status eq 'done') {
         $self->{scoreboard}->write($slot, 'wait');
-        $poe_kernel->yield('shutdown');
+        $self->do_shutdown;
         return;
     }
 
@@ -1086,7 +1121,7 @@ package Daemon;
 use strict;
 use POE;
 
-use POE::API::Peek;
+# use POE::API::Peek;
 use Scalar::Util qw( blessed );
 
 use vars qw($alias);
@@ -1120,6 +1155,7 @@ sub peek
 {
     my($package, $verbose)=@_;
 
+    return $POE::Component::Daemon::NO_PEEK if $POE::Component::Daemon::NO_PEEK;
     my $self;
     my $api=POE::API::Peek->new();
     my @queue = $api->event_queue_dump();
@@ -1150,7 +1186,7 @@ sub peek
 
     if($verbose) {
         $ret.="Sessions: \n" if $api->session_count;
-        foreach my $session ( sort { $a->ID <=> $b->ID } $api->session_list) {
+        foreach my $session ( sort { $a->ID cmp $b->ID } $api->session_list) {
             my $ref=0;
             $ret.="\tSession ".$api->session_id_loggable($session)." ($session)";
 
@@ -1697,7 +1733,7 @@ Philip Gwyn, E<lt>gwyn -AT- cpan.orgE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2004-2010 by Philip Gwyn
+Copyright 2004-2011 by Philip Gwyn. All rights reserved.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 

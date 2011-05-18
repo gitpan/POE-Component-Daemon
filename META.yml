@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               POE-Component-Daemon
-version:            0.1203
+version:            0.1300
 abstract:           ~
 author:
     - Philip Gwyn
@@ -11,9 +11,8 @@ configure_requires:
 build_requires:
     ExtUtils::MakeMaker:  0
 requires:
-    IPC::SysV:       1
-    POE:             1
-    POE::API::Peek:  1
+    IPC::SysV:  1
+    POE:        1
 no_index:
     directory:
         - t

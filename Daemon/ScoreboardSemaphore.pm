@@ -1,4 +1,4 @@
-#$Id: ScoreboardSemaphore.pm 700 2010-12-15 16:43:10Z fil $
+#$Id: ScoreboardSemaphore.pm 760 2011-05-18 18:14:30Z fil $
 ########################################################
 package POE::Component::Daemon::Scoreboard;
 
@@ -11,7 +11,7 @@ use IPC::SysV qw(IPC_PRIVATE S_IRWXU IPC_CREAT SEM_UNDO);
 use IPC::Semaphore;
 use Carp;
 
-$VERSION = '0.1100';
+$VERSION = '0.1300';
 
 sub DEBUG () { 1 }
 

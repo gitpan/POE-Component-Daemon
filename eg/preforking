@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id: preforking 706 2010-12-15 20:30:46Z fil $
+# $Id: preforking 760 2011-05-18 18:14:30Z fil $
 use strict;
 
 # use Religion::Package qw(1 1);
@@ -19,6 +19,8 @@ my $port=shift;
 die "Usage: $0 port" unless defined $port;
 
 my $logfile = "$FindBin::Dir/log_preforking";
+
+# $DB::fork_TTY='/dev/pts/4';
 
 #########################
 POE::Session->create(

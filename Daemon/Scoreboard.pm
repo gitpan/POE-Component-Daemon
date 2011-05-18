@@ -1,4 +1,4 @@
-#$Id: Scoreboard.pm 700 2010-12-15 16:43:10Z fil $
+#$Id: Scoreboard.pm 760 2011-05-18 18:14:30Z fil $
 ########################################################
 package POE::Component::Daemon::Scoreboard;
 
@@ -10,7 +10,7 @@ use vars qw($VERSION $UNIQUE);
 use IPC::SysV qw(IPC_PRIVATE S_IRWXU IPC_CREAT SEM_UNDO);
 use Carp;
 
-$VERSION = '0.1100';
+$VERSION = '0.1300';
 
 sub DEBUG () { 0 }
 
@@ -84,6 +84,7 @@ sub drop
 sub write
 {
     my($self, $slot, $value)=@_;
+    croak "$$: Missing slot" unless defined $slot;
     if($slot >= $self->{N}) {
         carp "$slot isn't a known slot\n";
         return;

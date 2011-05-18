@@ -1,5 +1,14 @@
 Revision history for Perl extension POE::Component::Daemon.
 
+0.1300 2011/May/18
+    - Removed dependence on POE::API::Peek
+    - Fixed, tested and working on POE 1.311
+
+0.1204 2011/Fev/18
+    - Moved all ->yield( 'shutdown' ) to ->do_shutdown();
+    - daemon_shutdown is now expedited with ->call()
+    - Tweak cookie crumbs
+
 0.1203 2011/Jan/06
     - Check for a working shmget() in Makefile.PL
 

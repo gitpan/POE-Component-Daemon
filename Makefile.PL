@@ -33,7 +33,7 @@ WriteMakefile(
     'PREREQ_PM'		=> {
         'IPC::SysV'       => 1,
         'POE'             => 1,
-        'POE::API::Peek'  => 1        
+        # 'POE::API::Peek'  => 1        
     },
     dist=>{COMPRESS=>'gzip -9f', EXT=>'gz'},
 );
