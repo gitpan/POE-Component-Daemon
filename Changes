@@ -1,5 +1,8 @@
 Revision history for Perl extension POE::Component::Daemon.
 
+0.1400 2013/Jul/21
+    - Fixed max/min spare setting and defaults (RT 86900) 
+
 0.1300 2011/May/18
     - Removed dependence on POE::API::Peek
     - Fixed, tested and working on POE 1.311
