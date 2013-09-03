@@ -26,20 +26,16 @@ if( $@ ) {
 }
 
 WriteMakefile(
-    'AUTHOR'         => 'Philip Gwyn',
+    'AUTHOR'         => 'Philip Gwyn <gwyn -at- cpan.org>',
     'NAME'	    	=> 'POE::Component::Daemon',
-    'VERSION_FROM'	=> 'lib/POE/Component/Daemon.pm', # finds $VERSION
+    'VERSION_FROM'	=> 'Daemon.pm', # finds $VERSION
+    'LICENSE'       => 'perl',
     'PREREQ_PM'		=> {
-        'IPC::SysV'       => 1,
-        'POE'             => 1,
+        'IPC::SysV'        => 1,
+        'POE'              => 1,
+        'File::Basename'   => 1,
+        'File::Copy'       => 1,
         # 'POE::API::Peek'  => 1        
     },
-    META_MERGE => {
-     resources => {
-       repository => 'https://github.com/hashbangperl/PoCoDaemon',
-    },
-    },
-    ($ExtUtils::MakeMaker::VERSION >= 6.3002 ? ('LICENSE'  => 'perl', ) : ()),
-
     dist=>{COMPRESS=>'gzip -9f', EXT=>'gz'},
 );

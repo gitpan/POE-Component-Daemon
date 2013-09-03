@@ -1,3 +1,5 @@
+#$Id: Daemon.pm 911 2012-07-29 13:52:13Z monaco $
+########################################################
 package POE::Component::Daemon;
 
 use 5.00405;
@@ -9,11 +11,13 @@ use POSIX qw(EAGAIN ECHILD SIGINT SIGKILL SIGTERM);
 use POE;
 use Carp;
 use Data::Dumper;
+use File::Basename qw( basename );
+use File::Copy qw( move );
 use Scalar::Util qw( blessed );
 
 use POE::Component::Daemon::Scoreboard;
 
-$VERSION = '0.1400';
+$VERSION = '0.1301';
 
 sub DEBUG () { 0 }
 sub DEBUG_SC () { DEBUG or 0 }
@@ -24,7 +28,6 @@ BEGIN {
     $NO_PEEK = $@ if $@;
     # warn $NO_PEEK;
 }
-
 
 ########################################################
 sub new
@@ -85,14 +88,45 @@ sub drop_privs
 sub open_logfile
 {
     my($self)=@_;
-    my $logfile = $self->{logfile};
+    my $logfile = $self->logfile_name;
     return unless $logfile;
     return if $self->{"logfile done"}++;
-    open STDOUT, ">>$logfile" or die "Unable to write to $logfile: $!\n";
+    DEBUG and warn "Log file is $logfile\n";
+    open STDOUT, ">>$logfile" or die "Unable to write to $logfile: $!\n";   
     open STDERR, ">&STDOUT"   or die "Unable to reopen STDERR: $!\n";
     STDERR->autoflush(1);
     STDOUT->autoflush(1);
     return 1;
+}
+
+sub logfile_name
+{
+    my( $self ) = @_;
+    return unless $self->{logfile};
+    my $logfile = $self->{logfile};
+    if( $self->{logfile_per_process} and $self->{'is a child'} ) {
+        $logfile .= "-$$";
+    }
+    return $logfile;
+}
+
+
+sub reopen_logfile
+{
+    my( $self ) = @_;
+    delete $self->{"logfile done"};
+    $self->open_logfile;
+    DEBUG and warn "Start log\n";
+}
+
+sub rotate_logfile
+{
+    my( $self, $dir ) = @_;
+    my $logfile = $self->logfile_name;
+    return unless $logfile;
+    my $file = basename $logfile;
+    my $dest = File::Spec->catfile( $dir, $file );
+    eval { move $file, $dest } or warn $@;
 }
 
 ########################################################
@@ -115,7 +149,7 @@ sub detach
         if(0==$pid) {                   # grand-child
             $gen="child";
             DEBUG and warn "$$: We are the $gen";
-            POSIX::setsid() or
+            POSIX::setsid() or 
                 warn "$$: Unable to setsid(): $! (continuing anyway)";
             if( $poe_kernel->can( 'has_forked' ) ) {
                 $poe_kernel->has_forked;
@@ -156,7 +190,7 @@ sub detach
     }
 
     # Do what we must.
-    exit( $exitval );
+    exit( $exitval ); 
 }
 
 ########################################################
@@ -199,23 +233,24 @@ sub default_min_max
     my($self)=@_;
     if($self->{max_children}) {
         if($self->{max_spare}) {
-            $self->{min_spare} = int($self->{max_spare} / 2) unless (defined $self->{min_spare});
+            $self->{min_spare} = int($self->{max_spare} /2) unless defined $self->{min_spare};
         }
         else {
-            $self->{min_spare} = int($self->{max_children} * 0.2) unless (defined $self->{min_spare});
-            $self->{max_spare} = int($self->{max_children} * 0.8) unless (defined $self->{max_spare});
+            $self->{min_spare} = int($self->{max_children} * 0.2) unless defined $self->{min_spare};
+            $self->{max_spare} = int($self->{max_children} * 0.8) unless defined $self->{max_spare};
         }
-        $self->{min_spare} = 1 unless (defined $self->{min_spare});
-        $self->{max_spare} = 2 unless (defined $self->{max_spare});
+        $self->{min_spare} = 1  unless defined $self->{min_spare};
+        $self->{max_spare} = 2  unless defined $self->{max_spare};
         if( $self->{max_spare} <  $self->{min_spare} ) {
             confess "Max_spare can't be smaller then $self->{min_spare}; madness follows.";
         }
     }
     else {
         # We couldn't be here unless start_children is set
-        $self->{min_spare} = $self->{start_children} unless (defined $self->{min_spare});
-        $self->{max_spare} = 2 * $self->{min_spare} unless (defined $self->{max_spare});
-        $self->{max_children} = $self->{start_children} + $self->{max_spare};
+        $self->{min_spare} = $self->{start_children} unless defined $self->{min_spare};
+        $self->{max_spare} = 2*$self->{min_spare} unless defined $self->{max_spare};
+        $self->{max_children} = $self->{start_children} 
+                                    + $self->{max_spare};
     }
     DEBUG and warn "$$: min_spare=$self->{min_spare} max_spare=$self->{max_spare} max_children=$self->{max_children}";
 }
@@ -232,7 +267,7 @@ sub _start
     $kernel->sig(shutdown => 'shutdown');
     $kernel->sig(TERM => 'sig_TERM');
     $kernel->sig(HUP  => 'sig_HUP');
-    $kernel->sig(INT  => 'sig_INT');
+    $kernel->sig(INT  => 'sig_INT'); 
 
     $self->inform_others( 'daemon_start' );
 
@@ -242,12 +277,12 @@ sub _start
     }
     elsif($self->is_fork) {                 # forking
         $kernel->yield( 'check_scoreboard' );   # start this loop
-    }
+    } 
     else {
         $kernel->yield('waste_time');       # keep the daemon alive
         return;                             # and do nothing else
     }
-
+                                            
     ####                                    # keep track of children
     $self->{children} = {};
     $self->{'failed forks'} = [];
@@ -288,7 +323,7 @@ sub waste_time
     my($self, $kernel)=@_[OBJECT, KERNEL];
     return if $self->{'is a child'};
 
-    DEBUG and
+    DEBUG and 
         warn "$$: Still alive!";
 
     unless($self->{'been told we are parent'}) {
@@ -313,14 +348,14 @@ sub babysit
               $self->{'is a child'};        # or if we are a child
 
     my @children=keys %{$self->{children}};
-    ($self->{verbose} or DEBUG) and
+    ($self->{verbose} or DEBUG) and 
             warn "$$: Babysiting ", scalar(@children),
                             " children ", join(", ", sort @children);
     my %table;
 
     if($self->{proctable}) {
         my $table=$self->{proctable}->table;
-        %table=map {($_->pid, $_)} @$table
+        %table=map {($_->pid, $_)} @$table  
     }
 
     my(%missing, $state, $time, %rogues, %ok);
@@ -332,7 +367,7 @@ sub babysit
                 my $t=waitpid($pid, POSIX::WNOHANG());
                 if($t==$pid) {
                     # process was reaped, now fake a SIGCHLD
-                    # DEBUG and
+                    # DEBUG and 
                         warn "$$: Faking a CHLD for $pid";
                     $kernel->yield('sig_CHLD', 'CHLD', $pid, $?, 1);
                     $ok{$pid}=1;
@@ -340,7 +375,7 @@ sub babysit
                     $self->{verbose} and warn "$$: $pid is a $state and couldn't be reaped.";
                     $missing{$pid}=1;
                 }
-            }
+            }    
             elsif($state eq 'run') {
                 $time=eval{$table{$pid}->utime + $table{$pid}->stime};
                 warn $@ if $@;
@@ -348,7 +383,7 @@ sub babysit
 
                 if($time and $time > 600000) { # arbitrary limit of 10 minutes
                     $rogues{$pid}=$table{$pid};
-                    # DEBUG and
+                    # DEBUG and 
                         warn "$$: $pid has gone rogue, time=$time ms";
                 } else {
                     warn "$$: $pid time=$time ms";
@@ -362,16 +397,16 @@ sub babysit
                 $self->{verbose} and warn "$$: $pid has unknown state '$state'";
                 $ok{$pid}=1;
             }
-        }
+        } 
         elsif($self->{proctable}) {
             $self->{verbose} and warn "$$: $pid isn't in proctable!";
             $missing{$pid}=1;
-        }
+        } 
         else {                        # try another means.... :/
             if(-d "/proc" and not -d "/proc/$pid") {
                 DEBUG and warn "$$: Unable to stat /proc/$pid!  Is the child missing";
                 $missing{$pid}=1;
-            }
+            } 
             elsif(not $missing{$pid}) {
                 $ok{$pid}=1;
             }
@@ -380,7 +415,7 @@ sub babysit
 
     # if a process is MIA, we fake a death, and spawn a new child (if needs be)
     foreach my $pid (keys %missing) {
-        #$self->{verbose} and
+        #$self->{verbose} and 
             warn "$$: Faking a CHLD for $pid MIA";
         $kernel->yield('sig_CHLD', 'CHLD', $pid, 0, 1);
     }
@@ -394,14 +429,14 @@ sub babysit
     }
 
     if(%rogues) {
-        # Start the rogues delay loop when going from no rogues to have
+        # Start the rogues delay loop when going from no rogues to have 
         # rogues
         # NB: yield causes the event to fire after this function exits
         $kernel->yield('rogues') if not $self->{rogues};
 
         $self->{rogues}||={};
         foreach my $pid (keys %rogues) {
-            if($self->{rogues}{$pid}) {
+            if($self->{rogues}{$pid}) { 
                 $self->{rogues}{$pid}{proc}=$rogues{$pid};
             } else {
                 $self->{rogues}{$pid}={proc=>$rogues{$pid}, tries=>0};
@@ -435,19 +470,19 @@ sub rogues
             if($rogue->{tries} < 1)    { $signal=SIGINT;  }
             elsif($rogue->{tries} < 2) { $signal=SIGTERM; }
             elsif($rogue->{tries} < 3) { $signal=SIGKILL; }
-
+    
             if($signal) {
                 DEBUG and warn "$$: Sending signal $signal to rogue $pid";
                 unless($rogue->{proc}->kill($signal)) {
                     warn "$$: Error sending signal $signal to $pid: $!";
                     delete $self->{rogues}{$pid};
                 }
-            }
+            } 
             else {
                 # if SIGKILL didn't work, it's beyond hope!
                 $kernel->yield('sig_CHLD', 'CHLD', $pid, 0, 1);
                 delete $self->{rogues}{$pid};
-                # $self->{verbose} and
+                # $self->{verbose} and 
                     warn "$$: Faking a CHLD for rogue $pid";
             }
             $rogue->{tries}++;
@@ -475,14 +510,18 @@ sub _stop
 # Someone wants us to exit... oblige
 sub do_shutdown
 {
-    # print STDERR "$$: do_shutdown\n";
+    DEBUG and print STDERR "$$: do_shutdown\n";
     $poe_kernel->call( $poe_kernel->get_active_session, 'shutdown' );
 }
+
 sub shutdown
 {
     my($self, $kernel)=@_[OBJECT, KERNEL];
 
-    $self->{verbose} and
+    # $main::TRACE_REFCNT = 1;
+    # Daemon->peek(1);
+
+    # $self->{verbose} and 
         warn "$$: shutdown";
     if($self->{rogues}) {
         $kernel->delay('rogues');   # we no longer care about rogues
@@ -514,17 +553,18 @@ sub shutdown
     $self->{'die'}=1;                       # prevent race conditions
     $self->inform_others( 'daemon_shutdown' );
 
-    # Remove signal handlers so that some versions of POE can shut down
+    # Remove signal handlers so that some versions of POE can shut down 
     $kernel->sig( 'CHLD' );
     $kernel->sig( 'HUP'  );
-    $kernel->sig( 'INT'  );
-    $kernel->sig( 'TERM' );
+    $kernel->sig( 'INT'  ); 
+    $kernel->sig( 'TERM' ); 
+
     return;
 }
 
 ########################################################
 # The server has been requested to fork, so fork already.
-sub fork
+sub fork 
 {
     my ($kernel, $self, $req) = @_[KERNEL, OBJECT, ARG0];
 
@@ -551,7 +591,7 @@ sub fork
         # throwing fork events around, I could end up with too many
         # children.  Either I drop requests on the floor (bad), or I save
         # them via fork_failed, which means the events could end up in other
-        # children (less bad) or I just let them succeed and hope that
+        # children (less bad) or I just let them succeed and hope that 
         # > {max_children} isn't all that horrendeous (least bad so far)
     }
 
@@ -563,7 +603,7 @@ sub fork
         return;
     }
 
-    DEBUG and
+    DEBUG and 
         warn "$$: Forking a child";
     my $pid = fork();                   # try to fork
     unless (defined($pid)) {            # did the fork fail?
@@ -626,8 +666,19 @@ sub become_child
 {
     my($self, $slot, $req)=@_;
 
-    ( $self->{verbose} or DEBUG )
+    ( $self->{verbose} or DEBUG ) 
         and warn "$$: Created ", scalar localtime;
+    # This resets some kernel data that was preventing the child process
+    # from handling CHLD
+    # $poe_kernel->_data_sig_cease_polling;
+
+    ## reset the kernel->ID
+    # Force each process to have a unique ID.  IKC depends on unique IDs
+#    unless( $poe_kernel->can( 'has_forked' ) ) {
+#        $poe_kernel->[ POE::Kernel::KR_ID ] = undef();
+#    }
+    # Above is for Olde Schoole, pre-has_forked() POE
+    
 
     ## Clean out stuff that the parent needs but not the children
 
@@ -637,14 +688,21 @@ sub become_child
     delete $self->{'failed forks'};
 
     $poe_kernel->sig('CHLD');
-    $poe_kernel->sig('INT');
+    $poe_kernel->sig('INT'); 
     # remove the wait for babysit
     $poe_kernel->delay('babysit') if $self->{'babysit'};
     # remove the wait for checking the scorebard
     $poe_kernel->delay('check_scoreboard') if $self->is_prefork or
                                               $self->is_fork;
+
+    foreach my $pid ( keys %{ $self->{children} || {} } ) {
+        $poe_kernel->sig_child( $pid );
+    }
+
     # remove these fields
     delete @{$self}{ qw(rogues proctable children) };
+
+    $self->reopen_logfile;
 
     # Tell everyone we are now a child
     $self->inform_others( 'daemon_child', $req );
@@ -667,7 +725,7 @@ sub become_child
 ########################################################
 # Retry failed forks.  This is invoked (after a brief delay) if the
 # 'fork' state encountered a temporary error.
-sub retry
+sub retry 
 {
     my ($kernel, $self) = @_[KERNEL, OBJECT];
     if($self->{'is a child'} or not $self->{children}) {
@@ -695,14 +753,14 @@ sub expedite_signal
 {
     my( $self, $signal, @etc ) = @_;
 
-    DEBUG and
+    DEBUG and 
         warn "$$: Expedite signal $signal";
 
     my $api = POE::API::Peek->new();
     my %watchers = $api->signal_watchers( $signal );
 
     while( my( $session, $event ) = each %watchers ) {
-        DEBUG and
+        DEBUG and 
             warn "$$: Signal $signal is $session/$event";
         $poe_kernel->call( $session, $event, $poe_kernel, @etc );
     }
@@ -713,7 +771,7 @@ sub inform_others
 {
     my( $self, $signal, @etc ) = @_;
 
-    $self->{verbose} and
+    $self->{verbose} and 
         warn "$$: Inform others about $signal";
 
     if( !$NO_PEEK and ($signal eq 'daemon_shutdown' or
@@ -741,7 +799,7 @@ sub sig_CHLD
     my ($kernel, $self, $signal, $pid, $status, $fake) =
                 @_[KERNEL, OBJECT, ARG0, ARG1, ARG2, ARG3];
 
-    ( DEBUG or $self->{verbose} ) and
+    ( DEBUG or $self->{verbose} ) and 
         warn "$$: SIGCHLD pid=$pid";
 
     ##########
@@ -753,7 +811,8 @@ sub sig_CHLD
 
     return if $self->{"is a child"};
 
-#    ( DEBUG or $self->{verbose} ) and
+#    ( DEBUG or $self->{verbose} ) and 
+    $INC{'Test/More.pm'} or
         warn "$$: SIGCHLD pid=$pid";
 
     ##########
@@ -762,7 +821,7 @@ sub sig_CHLD
         my $slot=delete $self->{children}->{$pid};
         if (defined $slot) {
             DEBUG and warn "$$: Parent caught SIGCHLD for $pid.  children: (",
-                                join(' ', sort keys %{$self->{children}}),
+                                join(' ', sort keys %{$self->{children}}), 
                                 ")";
             $self->{verbose} and warn "$$: Child $pid ",
                         ($fake?'is gone':'exited normaly');
@@ -771,10 +830,10 @@ sub sig_CHLD
             # Don't do anything else; wait for regular check_scoreboard to
             # do it's thing.  Otherwise we have to check min_spare/max_spare
             # and stuff like that.
-        }
+        } 
         elsif($fake) {
             warn "$$: Needless fake CHLD for $pid.";
-        }
+        } 
         else {
             warn "$$: CHLD for $pid child of someone else.";
             warn Dumper $self;
@@ -790,10 +849,10 @@ sub sig_CHLD
 # The shutdown event handler takes care of cleanup.
 sub sig_INT
 {
-    my ($kernel, $self, $signal, $pid, $status) =
+    my ($kernel, $self, $signal, $pid, $status) =  
                 @_[KERNEL, OBJECT, ARG0, ARG1, ARG2];
 
-    ( DEBUG or $self->{verbose} ) and
+    ( DEBUG or $self->{verbose} ) and 
         warn "$$: SIGINT";
     $self->do_shutdown;
     $kernel->sig_handled();         # INT is a terminal
@@ -808,10 +867,10 @@ sub sig_INT
 # Terminal signals aren't handled, so the session will stop on SIGINT.
 sub sig_TERM
 {
-    my ($kernel, $self, $signal, $pid, $status) =
+    my ($kernel, $self, $signal, $pid, $status) =  
                 @_[KERNEL, OBJECT, ARG0, ARG1, ARG2];
 
-    ( DEBUG or $self->{verbose} ) and
+    ( DEBUG or $self->{verbose} ) and 
         warn "$$: SIGTERM";
     $self->do_shutdown;
     $kernel->sig_handled();     # TERM is a terminal
@@ -822,10 +881,10 @@ sub sig_TERM
 # Close the log file and reopen
 sub sig_HUP
 {
-    my ($kernel, $self, $signal, $pid, $status) =
+    my ($kernel, $self, $signal, $pid, $status) =  
                 @_[KERNEL, OBJECT, ARG0, ARG1, ARG2];
 
-    ( DEBUG or $self->{verbose} ) and
+    ( DEBUG or $self->{verbose} ) and 
         warn "$$: SIGHUP (logfile=$self->{logfile})";
     $kernel->sig_handled();
 
@@ -849,7 +908,7 @@ sub fork_off
 {
     my($self, $n)=@_;
     if(ref $n) {
-        DEBUG and
+        DEBUG and 
             warn "$$: Fork off ", (0+@$n), " children";
         if( 1==@$n and $self->is_fork) {
 
@@ -857,7 +916,7 @@ sub fork_off
             # update_status( 'req' ) for a new request.  That being the case,
             # we want to prevent the select loop from running.
 
-            $poe_kernel->call( $poe_kernel->get_active_session,
+            $poe_kernel->call( $poe_kernel->get_active_session, 
                                 'fork', @$n );
         } else {
             foreach my $req (@$n) {
@@ -867,8 +926,8 @@ sub fork_off
         }
          return;
     }
-
-    DEBUG and
+    
+    DEBUG and 
         warn "$$: Fork off $n children";
     for(my $q1=0; $q1 < $n; $q1++) {
         $self->{"pending forks"}++;
@@ -896,14 +955,11 @@ sub check_scoreboard
 
     while(my($pid, $slot)=each %{$self->{children}}) {
         DEBUG and warn "$$: child at slot $slot ($pid: $slots->[$slot])";
-        if($slots->[$slot] eq 'w' or
+        if($slots->[$slot] eq 'w' or 
             $slots->[$slot] eq 'f') {      # waiting for req
-            warn "$pid is still forking" if $slots->[$slot] eq 'f';
+            warn "$pid is still forking\n" if DEBUG and $slots->[$slot] eq 'f';
             push @waiting, $pid;
         }
-        else {
-        }
-
     }
 
 
@@ -912,19 +968,25 @@ sub check_scoreboard
         DEBUG and warn "$$: waiting=$waiting";
         if($waiting < $self->{min_spare}) {
             my $n=$self->{min_spare} - $waiting;
-            DEBUG_SC and
+            # DEBUG_SC and 
                 warn "$$: Spawning $n spares";
             $self->fork_off($n);
         }
-        if($waiting > $self->{max_spare}) {
+        elsif($waiting > $self->{max_spare}) {
             my $n=$waiting - $self->{max_spare};
-            DEBUG_SC and warn "$$: Killing $n spares";
+            # DEBUG_SC and 
+                warn "$$: Killing $n spares";
             foreach my $pid ( @waiting[0..($n-1)] ) {
                 kill SIGINT, $pid or warn "$$: killing $pid: $!";
             }
         }
+        elsif( not $self->{statis} ) {
+            $INC{'Test/More.pm'} or
+                warn "All systems are go\n";
+            $self->{statis} = 1;
+        }
     }
-    elsif( $self->is_fork and
+    elsif( $self->is_fork and 
                     $self->{max_children} <= keys %{$self->{children}} ) {
         unless( $self->{paused} ) {
             $self->inform_others( 'daemon_pause' );
@@ -954,7 +1016,7 @@ sub update_status
     elsif($self->is_fork) {
         if($self->{'is a child'}) {
             return $self->update_status_fork_child($status, $parm);
-        }
+        } 
         else {
             return $self->update_status_fork_parent($status, $parm);
         }
@@ -977,23 +1039,25 @@ sub update_status_prefork
 
     my $slot=$self->{'my slot'};
     unless( defined $slot ) {
-        die "$$: Missing slot.  Update sent from $file line $line.\n"
+        die "$$: Missing slot.  Update sent from $file line $line.\n" 
     }
     my $current_status=$self->{scoreboard}->read($slot)||'unknown';
-    DEBUG and
+    DEBUG and 
         warn "$$: current_status=$current_status -> status=$status";
 
     if($status eq 'wait' or $status eq 'done') {
-        DEBUG and warn "$$: Moving to status=wait";
+        # DEBUG and 
+            warn "$$: Moving to status=wait";
         $self->{scoreboard}->write($slot, 'wait');
         if($self->{requestN} >= $self->{'max requests'}) {
-            DEBUG and
+            # DEBUG and 
                 warn "$$: Handled $self->{requestN} requests, shutting down status=$status";
             $self->do_shutdown;
         }
         elsif($current_status ne 'w') {
             # use Carp qw( cluck );
             # cluck "$$: daemon_accept";
+            warn "$$: requestN=$self->{requestN} < max requests=$self->{'max requests'}";
             $self->inform_others( 'daemon_accept' );
         }
         else {
@@ -1107,6 +1171,7 @@ package Daemon;
 use strict;
 use POE;
 
+# use POE::API::Peek;
 use Scalar::Util qw( blessed );
 
 use vars qw($alias);
@@ -1144,9 +1209,9 @@ sub peek
     my $self;
     my $api=POE::API::Peek->new();
     my @queue = $api->event_queue_dump();
-
+    
     my $ret = "Event Queue ($POE::Component::Daemon::VERSION):\n";
-
+  
     my $events = {};
 
     foreach my $item (@queue) {
@@ -1155,11 +1220,16 @@ sub peek
         $ret .= "\t\tEvent: ".$item->{event}."\n";
 
         if($verbose) {
-            $events->{ $item->{source}->ID }{source} ++;
+            if( $item->{source}->ID == $item->{destination}->ID ) {
+                $events->{ $item->{destination}->ID }{source_destination} ++; 
+            }
+            else {
+                $events->{ $item->{source}->ID }{source} ++; 
+                $events->{ $item->{destination}->ID }{destination} ++; 
+            }
             $ret .= "\t\tSource: ".
                     $api->session_id_loggable($item->{source}).
                     "\n";
-            $events->{ $item->{destination}->ID }{destination} ++;
             $ret .= "\t\tDestination: ".
                     $api->session_id_loggable($item->{destination}).
                     "\n";
@@ -1182,14 +1252,22 @@ sub peek
             $ref += $q1;
             $ret.="\t\textref count: $q1 (Stay alive)\n" if $q1;
 
-            $q1=$api->session_handle_count($session);
-            $ref += $q1;
+            $q1=$api->session_handle_count($session->ID);
+            $ref += $q1;  
             $ret.="\t\thandle count: $q1 (Stay alive)\n" if $q1;
 
             my @aliases = $api->session_alias_list($session);
             $ref += @aliases;
             $q1=join ',', @aliases;
             $ret.="\t\tAliases: $q1\n" if $q1;
+
+            if( $poe_kernel->can( '_data_sig_session_awaits_pids') ) {
+                $q1 = $poe_kernel->_data_sig_session_awaits_pids( $session->ID );
+            } else {
+                $q1 = $poe_kernel->_data_sig_pids_ses( $session->ID );
+            }
+            $ref += $q1;
+            $ret .= "\t\tPID count: $q1 (Stay alive)\n" if $q1;
 
             my @children = $api->get_session_children($session);
             if(@children) {
@@ -1210,9 +1288,15 @@ sub peek
                 $ref += $q1;
             }
 
+            $q1 = $events->{ $session->ID }{source_destination};
+            if( $q1 ) {
+                $ret.="\t\tEvent source+destination count: $q1 (Stay alive)\n";
+                $ref += $q1;
+            }
+
             if($refcount != $ref) {
                 $ret.="\t\tStay alive: refcount=$refcount counted=$ref\n";
-            }
+            }  
             if( $alias and grep $alias, @aliases ) {
                 my $state = $session->[ POE::Session::SE_STATES ]{_start};
                 if( $state and 'ARRAY' eq ref $state and blessed $state->[0] ) {
@@ -1250,6 +1334,7 @@ sub peek
 
 1;
 __END__
+# Below is stub documentation for your module. You'd better edit it!
 
 =head1 NAME
 
@@ -1275,7 +1360,7 @@ POE::Component::Daemon - Handles all the housework for a daemon.
         },
 
         # socketfactory got a connection handle it here
-        accept=>sub {
+        accept=>sub {       
             # tell Daemon session about this
             Daemon->update_status('req', $info);
         },
@@ -1283,7 +1368,7 @@ POE::Component::Daemon - Handles all the housework for a daemon.
         ###############
         # we are now the child process (via the sig() in _start
         request=>sub {
-            my($heap, $info)=@_[HEAP, ARG1];
+            my($heap, $info)=@_[HEAP, ARG1]; 
             # $info was passed here from accept accept
 
             # create POE::Wheel::ReadWrite
@@ -1299,7 +1384,7 @@ POE::Component::Daemon - Handles all the housework for a daemon.
             # tell Deamon session that this request is done
             $poe_kernel->post(Daemon=>'update_status', 'done');
         },
-    });
+    });      
 
 =head1 DESCRIPTION
 
@@ -1357,7 +1442,7 @@ This means the following steps are done.
     Tell POE::Component::Daemon we are no longer in a request
     POE::Component::Daemon will then shutdown this child process (signal
     daemon_shutdown).
-
+    
 Additionnaly, when POE::Component::Daemon detects that there are nearly too
 many child processes, it will send a L</daemon_pause> signal.  You should
 call L<POE::Wheel::SocketFactory/accept_pause>.  When the number of
@@ -1369,7 +1454,7 @@ The graph in F<forking-flow.png> might (or might not) help you understand
 the above.
 
 
-
+    
 =head2 PRE-FORKING
 
 The pre-forking model creates a pool of child processes before accepting
@@ -1379,12 +1464,12 @@ handle more then one request.  This is the model used by Apache.
 
 When pre-forking, you create your SocketFactory and immediately pause it
 with L<POE::Wheel::SocketFactory/accept_pause>.  Then spawn a
-L<POE::Component::Daemon>. and allow the kernel to run.
+L<POE::Component::Daemon>. and allow the kernel to run. 
 L<POE::Component::Daemon> will fork off the desired initial number of
 sub-processes (C<start_children>).  The child processes will be told they
 are children with a L</daemon_child> signal.  Your code then does what it
 needs and updates the status to 'wait' (L</update_status>).  When
-POE::Component::Daemon sees this, it fires off a L</daemon_accept> signal.
+POE::Component::Daemon sees this, it fires off a L</daemon_accept> signal. 
 Your code would then unpause the socket, with L<POE::Wheel::SocketFactory/accept_resume>.
 
 When you receive a new connection, the status to 'req' or 'long' (if it's a
@@ -1414,7 +1499,7 @@ In list form, that gives us:
     Talk with remote process
     When done, close the ReadWrite wheel
     Update status to 'done'
-    Wait for daemon_accept or daemon_shutdown signal
+    Wait for daemon_accept or daemon_shutdown signal    
 
 The graph in F<preforking-flow.png> might (or might not) help you understand
 the above.
@@ -1436,7 +1521,7 @@ processes are killed after 10 minutes.
 
 Babysiting is activated with the C<babysit> parameter to L</spawn>.
 
-Babysiting doesn't have a test case and is probably badly implemented.
+Babysiting doesn't have a test case and is probably badly implemented. 
 Patches welcome.
 
 =head1 METHODS
@@ -1457,7 +1542,7 @@ it, other code that depends on it might be confused.
 =item detach
 
 If true, POE::Component::Daemon will detach from the current process tree.  It does
-this by forking twice and the grand-child then calls L<POSIX/setsid>.
+this by forking twice and the grand-child then calls L<POSIX/setsid>. 
 Parent and grand-parent summarily exit.
 
 Default is to not detach.
@@ -1477,7 +1562,7 @@ output some details to STDERR.
 
 =item max_children
 
-Maximum number of child processes that POE::Component::Daemon may create.
+Maximum number of child processes that POE::Component::Daemon may create.  
 
 If set, but not C<start_children>, then POE::Component::Daemon acts as a post-forking
 daemon.  Note that it is unfortunately possible for POE::Component::Daemon to create
@@ -1494,7 +1579,7 @@ POE::Component::Daemon will fork off C<start_children> child processes.
 =item max_spare
 =item min_spare
 
-Used by pre-forking server to decide when to create more child processes.
+Used by pre-forking server to decide when to create more child processes. 
 If there are fewer than min_spare, it creates a new spare.  If there are
 more than max_spare, some of the spares killed off with TERM.
 
@@ -1562,7 +1647,7 @@ handler.  They will receive a TERM when current process exists.
     Daemon->peek( $verbose );
 
 Outputs the internal status of the POE::Kernel, with special attention paid
-to the reasons why a kernel won't exit.
+to the reasons why a kernel won't exit.  
 
 If C<$verbose> is false, only returns the event queue.  If C<$verbose> is
 set, details of each session are also output.
@@ -1579,7 +1664,8 @@ Now, instead of cursing the $GODS because your kernel doesn't exit when you
 think it should, you simply type the following in another window.
 
     kill -USR2 I<pid>
-
+    # or, if you are on Solaris or Linux
+    pkill -USR2 -o your-daemon
 
 
 
@@ -1662,7 +1748,7 @@ when all the initial children have been forked.
 
 =head2 daemon_child
 
-The current process is a child.
+The current process is a child.  
 
 This is sent by a pre-forking daemon just after forking a new process.  You
 must then update the status to 'wait'.
@@ -1683,7 +1769,7 @@ Generally you do this by calling L<POE::Wheel::SocketFactory/accept_resume>.
 
 =head2 daemon_pause
 
-There are too many child processes.  Do not accept any more requests.
+There are too many child processes.  Do not accept any more requests. 
 Generally you do this by calling L<POE::Wheel::SocketFactory/accept_pause>.
 
 
@@ -1699,37 +1785,11 @@ called when a child process has handled a certain number of requests.
 
 We received a HUP signal.  Any log files should be closed then reopenned.
 
+
 =head1 BUGS
 
 Tested on Linux and FreeBSD.
-
 Reports for Mac OS, and other BSDs would be appreciated.
-
-You can also look for information at:
-
-=over 4
-
-=item * RT: CPAN's request tracker (report bugs here)
-
-L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=POE-Component-Daemon>
-
-=item * AnnoCPAN: Annotated CPAN documentation
-
-L<http://annocpan.org/dist/POE-Component-Daemon>
-
-=item * CPAN Ratings
-
-L<http://cpanratings.perl.org/d/POE-Component-Daemon>
-
-=item *  METACPAN
-
-L<https://metacpan.org/module/POE::Component::Daemon/>
-
-=item * GITHUB
-
-L<https://github.com/hashbangperl/PoCoDaemon>
-
-=back
 
 Doesn't support Windows.
 
@@ -1743,9 +1803,10 @@ Philip Gwyn, E<lt>gwyn -AT- cpan.orgE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2004-2011 by Philip Gwyn. All rights reserved.
+Copyright 2004-2013 by Philip Gwyn. All rights reserved.
 
 This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself.
+it under the same terms as Perl itself. 
 
 =cut
+

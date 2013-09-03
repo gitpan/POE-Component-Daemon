@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id: preforking 760 2011-05-18 18:14:30Z fil $
+# $Id: preforking 911 2012-07-29 13:52:13Z monaco $
 use strict;
 
 # use Religion::Package qw(1 1);
@@ -143,7 +143,9 @@ inline_states=>{
             $heap->{wheel_client}->put( $heap->{parent} );
         }
         elsif($line eq 'PEEK') {
-            $heap->{wheel_client}->put( split "\n", Daemon->peek( 1 ) );
+            my $peek = eval { Daemon->peek( 1 ) };
+            $peek .= $@ if $@;
+            $heap->{wheel_client}->put( split "\n", $peek );
             $heap->{wheel_client}->put( "DONE" );
         }
         elsif($line eq 'STATUS') {

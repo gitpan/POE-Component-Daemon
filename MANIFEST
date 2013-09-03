@@ -1,10 +1,10 @@
 Changes
+Daemon.pm
 Makefile.PL
 MANIFEST
 README
-lib/POE/Component/Daemon.pm
-lib/POE/Component/Daemon/Scoreboard.pm
-lib/POE/Component/Daemon/ScoreboardSemaphore.pm
+Daemon/Scoreboard.pm
+Daemon/ScoreboardSemaphore.pm
 eg/forking
 eg/forking-flow.dot
 eg/forking-flow.png
@@ -17,5 +17,5 @@ t/11_daemon.t
 t/20_preforking.t
 t/30_forking.t
 t/Test.pm
-META.yml                                 Module meta-data (added by MakeMaker)
+META.yml                                 Module YAML meta-data (added by MakeMaker)
 META.json                                Module JSON meta-data (added by MakeMaker)
